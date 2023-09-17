@@ -9,6 +9,17 @@ class AdapterTrainingArguments:
     """Defines the adapters parameters."""
     train_task_adapters: Optional[bool] = field(default=False,
                                                 metadata={"help": "If set, adds task adapters in the model."})
+    train_lora: Optional[bool] = field(default=False,
+                                                metadata={"help": "If set, train lora in FFN."})
+
+    add_lora: Optional[bool] = field(default=False,
+                                                metadata={"help": "If set, adds lora in FFN."})
+
+    load_lora_path: Optional[str] = field(
+        default=None, metadata={"help": "config name for the adapter layers, should be selected "
+                                     f"in {sorted(ADAPTER_CONFIG_MAPPING.keys())}."}
+    )
+
     adapter_config_name: Optional[str] = field(
         default="adapter", metadata={"help": "config name for the adapter layers, should be selected "
                                      f"in {sorted(ADAPTER_CONFIG_MAPPING.keys())}."}
@@ -375,6 +386,13 @@ class DataTrainingArguments:
         },
     )
     max_train_samples: Optional[int] = field(
+        default=None,
+        metadata={
+            "help": "For debugging purposes or quicker training, truncate the number of training examples to this "
+            "value if set."
+        },
+    )
+    few_shot: Optional[int] = field(
         default=None,
         metadata={
             "help": "For debugging purposes or quicker training, truncate the number of training examples to this "

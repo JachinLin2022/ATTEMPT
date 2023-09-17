@@ -16,6 +16,7 @@
 Fine-tuning the library models for sequence to sequence.
 """
 # You can also adapt this script on your own sequence to sequence task. Pointers for this are left as comments.
+from adapters.lora import lora_state_dict
 from utils import modify_model_after_init, save_training_config, save_prompts
 import shutil
 import glob
@@ -127,6 +128,7 @@ def main():
         use_auth_token=True if model_args.use_auth_token else None,
     )
     config.train_task_adapters = adapter_args.train_task_adapters
+    config.add_lora = adapter_args.add_lora
     config.prefix_tuning = adapter_args.prefix_tuning
     config.attn_prefix_tuning = model_args.attn_prefix_tuning
     config.attn_method = model_args.attn_method
@@ -209,9 +211,16 @@ def main():
         model.update_layer_norm_weights(model_args.layer_norm_dir)
 
     model.resize_token_embeddings(len(tokenizer))
-    model = modify_model_after_init(
+    model:nn.Module = modify_model_after_init(
         model, training_args, adapter_args, adapter_config)
-
+    print(model)
+    for n,p in model.named_parameters():
+        if p.requires_grad:
+            print(n)
+    for n,p in model.named_parameters():
+        if 'lora' in n:
+            print(n)
+    print(model.encoder.block[0].layer[1].DenseReluDense.wi.weight)
     data_args.dataset_name = data_args.task_name
     data_args.eval_dataset_name = data_args.eval_dataset_name
     data_args.test_dataset_name = data_args.test_dataset_name
@@ -261,8 +270,8 @@ def main():
                                            seed=data_args.data_seed).get(
                 split="train",
                 split_validation_test=training_args.split_validation_test,
-                add_prefix=False if adapter_args.train_task_adapters else True,
-                n_obs=data_args.max_train_samples, lang=data_args.lang_name, file_name=train_file)
+                add_prefix=True if adapter_args.train_task_adapters else True,
+                n_obs=data_args.max_train_samples, lang=data_args.lang_name, file_name=train_file, few_shot=data_args.few_shot)
                 for dataset_name, dataset_config_name, train_file
                 in zip(data_args.dataset_name, data_args.dataset_config_name, data_args.train_files)]
         else:
@@ -271,8 +280,8 @@ def main():
                                            seed=data_args.data_seed).get(
                 split="train",
                 split_validation_test=training_args.split_validation_test,
-                add_prefix=False if adapter_args.train_task_adapters else True,
-                n_obs=data_args.max_train_samples, lang=data_args.lang_name, file_name=data_args.train_file)
+                add_prefix=True if adapter_args.train_task_adapters else True,
+                n_obs=data_args.max_train_samples, lang=data_args.lang_name, file_name=data_args.train_file, few_shot=data_args.few_shot)
                 for dataset_name, dataset_config_name
                 in zip(data_args.dataset_name, data_args.dataset_config_name)]
 
@@ -280,6 +289,10 @@ def main():
             tokenizer=tokenizer, default_max_length=data_args.max_target_length, )
             for dataset_name, dataset_config_name in zip(data_args.dataset_name, data_args.dataset_config_name)]
 
+        import random
+        for index in random.sample(range(len(train_datasets[0])), 3):
+            logger.info(f"Sample {index} of the training set: {train_datasets[0][index]}.")
+        exit(0)
         for i, train_dataset in enumerate(train_datasets):
             if model_args.shared_attn is True:
                 train_datasets[i] = train_datasets[i].map(
@@ -523,6 +536,9 @@ def main():
 
         if not model_args.save_prefix_only:
             trainer.save_state()
+
+        # torch.save(lora_state_dict(model), f'{training_args.output_dir}/lora.pt')
+        # print('save lora!!')
 
     if torch.cuda.is_available() and training_args.compute_memory:
         peak_memory = (torch.cuda.max_memory_allocated() / 1024 ** 2)/1000

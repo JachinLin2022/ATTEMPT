@@ -65,7 +65,34 @@ class AbstractTask(abc.ABC):
         generator.manual_seed(self.seed)
         return torch.randperm(num_samples, generator=generator).tolist()
 
-    def subsample(self, dataset, n_obs=None, indices=None):
+    def get_few_shot_indices(self, dataset, shot):
+        import random
+        random.seed(self.seed)
+        random_indices = list(range(0, len(dataset["label"])))
+        random.shuffle(random_indices)
+
+        label_count = {}
+        result = []
+        for index in random_indices:      
+            label = dataset['label'][index]
+            if label not in label_count:
+                label_count[label] = 0
+                not_hit = 0
+            else:
+                not_hit += 1
+                if not_hit == 1000:
+                    break
+
+            if label_count[label] < shot:
+                result.append(index)
+                label_count[label] += 1
+        
+        print('k-shot selection done!!')
+        print(label_count)
+        return result
+
+
+    def subsample(self, dataset, n_obs=None, indices=None, few_shot=None):
         """
         Given a dataset returns the subsampled dataset.
         :param n_obs: the number of samples of the subsampled dataset.
@@ -73,6 +100,10 @@ class AbstractTask(abc.ABC):
         from by shuffling the given dataset.
         :return: subsampled dataset.
         """
+        if few_shot is not None:
+            few_shot_indices = self.get_few_shot_indices(dataset, few_shot)
+            print(few_shot_indices)
+            return dataset.select(few_shot_indices)
         num_samples = len(dataset)
         n_obs = self.check_n_obs(n_obs, num_samples)
         if indices is None:
@@ -94,7 +125,7 @@ class AbstractTask(abc.ABC):
         return dataset.map(functools.partial(self.preprocessor, add_prefix=add_prefix),
                            remove_columns=dataset.column_names)
 
-    def get(self, split, add_prefix=True, n_obs=None, split_validation_test=False, lang=None, file_name=None):
+    def get(self, split, add_prefix=True, n_obs=None, split_validation_test=False, lang=None, file_name=None, few_shot=None):
         # For small datasets (n_samples < 10K) without test set, we divide validation set to
         # half, use one half as test set and one half as validation set.
         if split_validation_test and self.name in self.small_datasets_without_all_splits \
@@ -136,8 +167,8 @@ class AbstractTask(abc.ABC):
             else:
                 dataset = self.load_dataset(split=mapped_split)
             # shuffles the data and samples it.
-            if n_obs is not None:
-                dataset = self.subsample(dataset, n_obs)
+            if n_obs is not None or few_shot is not None:
+                dataset = self.subsample(dataset, n_obs, None, few_shot)
         return self.map_dataset(dataset, add_prefix)
 
 

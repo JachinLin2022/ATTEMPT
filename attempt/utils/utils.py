@@ -74,6 +74,12 @@ def freeze_model_params(model, adapter_args, adapter_config):
             if isinstance(sub_module, (AdapterController, Adapter)):
                 for param_name, param in sub_module.named_parameters():
                     param.requires_grad = True
+    # Unfreezes LoRA
+    if adapter_args.train_lora:
+        freeze_params(model)
+        for n, p in model.named_parameters():
+            if 'lora_' not in n:
+                p.requires_grad = False
 
     # Unfreezes last linear layer of decoder.
     if adapter_args.unfreeze_lm_head:
@@ -198,9 +204,14 @@ def pad_punctuation(text):
     return text
 
 
-def modify_model_after_init(model, training_args, adapter_args, adapter_config):
+def modify_model_after_init(model:nn.Module, training_args, adapter_args, adapter_config):
     # Freezes model parameters.
     freeze_model_params(model, adapter_args, adapter_config)
+    # load lora
+    if adapter_args.add_lora and adapter_args.load_lora_path is not None:
+        print(f'load lora weight from:{adapter_args.load_lora_path}')
+        lora_dict = torch.load(adapter_args.load_lora_path)
+        model.load_state_dict(lora_dict, strict=False)
 
     trainable_params = sum(p.numel()
                            for p in model.parameters() if p.requires_grad)

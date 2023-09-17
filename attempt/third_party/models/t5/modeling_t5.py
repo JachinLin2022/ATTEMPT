@@ -13,6 +13,7 @@
 # limitations under the License.
 """ PyTorch T5 model. """
 
+from audioop import bias
 import copy
 import math
 import os
@@ -46,7 +47,7 @@ from transformers.utils import logging
 from transformers.utils.model_parallel_utils import assert_device_map, get_device_map
 from .configuration_t5 import T5Config
 
-from adapters import AdapterController
+from adapters import AdapterController,Linear
 from typing import Dict, Any
 
 
@@ -266,10 +267,15 @@ class T5DenseReluDense(nn.Module):
     def __init__(self, config, adapter_config=None):
         super().__init__()
         self.bitfit = adapter_config.bitfit if adapter_config is not None else False
-        self.wi = nn.Linear(config.d_model, config.d_ff,
+        
+        if config.add_lora:
+            self.wi = Linear(config.d_model, config.d_ff, 16, 16, 0.1, bias=False if not self.bitfit else True, merge_weights=False)
+            self.wo = Linear(config.d_ff, config.d_model, 16, 16, 0.1, bias=False if not self.bitfit else True, merge_weights=False)
+        else:
+            self.wi = nn.Linear(config.d_model, config.d_ff,
                             bias=False if not self.bitfit else True)
-        self.wo = nn.Linear(config.d_ff, config.d_model,
-                            bias=False if not self.bitfit else True)
+            self.wo = nn.Linear(config.d_ff, config.d_model,
+                                bias=False if not self.bitfit else True)
         self.dropout = nn.Dropout(config.dropout_rate)
 
     def forward(self, hidden_states):
