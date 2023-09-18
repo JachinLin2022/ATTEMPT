@@ -267,10 +267,10 @@ class T5DenseReluDense(nn.Module):
     def __init__(self, config, adapter_config=None):
         super().__init__()
         self.bitfit = adapter_config.bitfit if adapter_config is not None else False
-        
         if config.add_lora:
-            self.wi = Linear(config.d_model, config.d_ff, 16, 16, 0.1, bias=False if not self.bitfit else True, merge_weights=False)
-            self.wo = Linear(config.d_ff, config.d_model, 16, 16, 0.1, bias=False if not self.bitfit else True, merge_weights=False)
+            
+            self.wi = Linear(config.d_model, config.d_ff, 64, 64, 0, bias=False if not self.bitfit else True, merge_weights=False)
+            self.wo = Linear(config.d_ff, config.d_model, 64, 64, 0, bias=False if not self.bitfit else True, merge_weights=False)
         else:
             self.wi = nn.Linear(config.d_model, config.d_ff,
                             bias=False if not self.bitfit else True)

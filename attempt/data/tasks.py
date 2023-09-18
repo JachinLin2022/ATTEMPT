@@ -155,7 +155,7 @@ class AbstractTask(abc.ABC):
                 dataset = self.load_dataset(split="train")
             indices = self.get_split_indices(
                 split, dataset, validation_size=1000)
-            dataset = self.subsample(dataset, n_obs, indices)
+            dataset = self.subsample(dataset, n_obs, indices, few_shot)
         else:
             mapped_split = self.split_to_data_split[split]
             if lang is not None:
@@ -304,6 +304,10 @@ class MRPC(AbstractTask):
 class COLA(AbstractTask):
     name = "cola"
     labels_list = ["0", "1"]
+    labels_map = {
+        '0':'unacceptable',
+        '1':'acceptable'
+    }
     metric = [metrics.matthews_corrcoef]
     metric_names = ["matthews_correlation"]
     split_to_data_split = {"train": "train",
@@ -316,7 +320,7 @@ class COLA(AbstractTask):
 
     def preprocessor(self, example, add_prefix=True):
         src_texts = ["sentence:", example['sentence']]
-        tgt_texts = [str(example['label'])]
+        tgt_texts = [self.labels_map[str(example['label'])]]
         return self.seq2seq_format(src_texts, tgt_texts, add_prefix)
 
 
@@ -417,6 +421,11 @@ class QQP(AbstractTask):
 class MNLI(AbstractTask):
     name = "mnli"
     labels_list = ["0", "1", "2"]
+    labels_map = {
+        '0':'entailment',
+        '1':'neutral',
+        "2":"contradiction"
+    }
     split_to_data_split = {"train": "train",
                            "validation": "validation_mismatched",
                            "test": "validation_matched"}
@@ -429,7 +438,7 @@ class MNLI(AbstractTask):
     def preprocessor(self, example, add_prefix=True):
         src_texts = ["premise:", example['premise'],
                      "hypothesis:", example["hypothesis"]]
-        tgt_texts = [str(example['label'])]
+        tgt_texts = [self.labels_map[str(example['label'])]]
         return self.seq2seq_format(src_texts, tgt_texts, add_prefix)
 
 
@@ -474,6 +483,10 @@ class MultiNLI(AbstractTask):
 class QNLI(AbstractTask):
     name = "qnli"
     labels_list = ["0", "1"]
+    labels_map = {
+        '0':'entailment',
+        '1':'not_entailment'
+    }
     metric = [metrics.accuracy]
     metric_names = ["accuracy"]
     split_to_data_split = {"train": "train",
@@ -486,7 +499,7 @@ class QNLI(AbstractTask):
     def preprocessor(self, example, add_prefix=True):
         src_texts = ["question:", example['question'],
                      "sentence:", example["sentence"]]
-        tgt_texts = [str(example['label'])]
+        tgt_texts = [self.labels_map[str(example['label'])]]
         return self.seq2seq_format(src_texts, tgt_texts, add_prefix)
 
 
@@ -513,6 +526,10 @@ class RTE(AbstractTask):
 class WNLI(AbstractTask):
     name = "wnli"
     labels_list = ["0", "1"]
+    labels_map = {
+        '0':'not_entailment',
+        '1':'entailment'
+    }
     metric = [metrics.accuracy]
     metric_names = ["accuracy"]
     split_to_data_split = {"train": "train",
@@ -525,7 +542,7 @@ class WNLI(AbstractTask):
     def preprocessor(self, example, add_prefix=True):
         src_texts = ["sentence1:", example['sentence1'],
                      "sentence2:", example["sentence2"]]
-        tgt_texts = [str(example['label'])]
+        tgt_texts = [self.labels_map[str(example['label'])]]
         return self.seq2seq_format(src_texts, tgt_texts, add_prefix)
 
 

@@ -78,8 +78,8 @@ def freeze_model_params(model, adapter_args, adapter_config):
     if adapter_args.train_lora:
         freeze_params(model)
         for n, p in model.named_parameters():
-            if 'lora_' not in n:
-                p.requires_grad = False
+            if 'lora_' in n:
+                p.requires_grad = True
 
     # Unfreezes last linear layer of decoder.
     if adapter_args.unfreeze_lm_head:

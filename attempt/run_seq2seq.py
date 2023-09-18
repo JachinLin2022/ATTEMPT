@@ -49,7 +49,7 @@ from pytz import common_timezones
 import torch
 import os
 from torch import nn
-
+import random
 from data.tasks import TASK_MAPPING
 from metrics.metrics import TASK_TO_METRICS
 from metrics.metrics import build_compute_metrics_fn
@@ -81,22 +81,22 @@ def main():
         model_args, data_args, training_args, adapter_args = parser.parse_args_into_dataclasses()
     # Detecting last checkpoint.
     last_checkpoint = None
-    if os.path.isdir(training_args.output_dir) and training_args.do_train and not training_args.overwrite_output_dir:
-        last_checkpoint = get_last_checkpoint(training_args.output_dir)
-        print("#### last_checkpoint ", last_checkpoint)
-        if last_checkpoint is None and len(os.listdir(training_args.output_dir)) > 0:
-            '''
-            raise ValueError(
-                f"Output directory ({training_args.output_dir}) already exists and is not empty. "
-                "Use --overwrite_output_dir to overcome."
-            )
-            '''
-            pass
-        elif last_checkpoint is not None:
-            logger.info(
-                f"Checkpoint detected, resuming training at {last_checkpoint}. To avoid this behavior, change "
-                "the `--output_dir` or add `--overwrite_output_dir` to train from scratch."
-            )
+    # if os.path.isdir(training_args.output_dir) and training_args.do_train and not training_args.overwrite_output_dir:
+    #     last_checkpoint = get_last_checkpoint(training_args.output_dir)
+    #     print("#### last_checkpoint ", last_checkpoint)
+    #     if last_checkpoint is None and len(os.listdir(training_args.output_dir)) > 0:
+    #         '''
+    #         raise ValueError(
+    #             f"Output directory ({training_args.output_dir}) already exists and is not empty. "
+    #             "Use --overwrite_output_dir to overcome."
+    #         )
+    #         '''
+    #         pass
+    #     elif last_checkpoint is not None:
+    #         logger.info(
+    #             f"Checkpoint detected, resuming training at {last_checkpoint}. To avoid this behavior, change "
+    #             "the `--output_dir` or add `--overwrite_output_dir` to train from scratch."
+    #         )
 
     # Setup logging
     logging.basicConfig(
@@ -219,8 +219,8 @@ def main():
             print(n)
     for n,p in model.named_parameters():
         if 'lora' in n:
-            print(n)
-    print(model.encoder.block[0].layer[1].DenseReluDense.wi.weight)
+            print(n, p.requires_grad,p.shape)
+    training_args.run_name = training_args.output_dir + '-' + ''.join(data_args.task_name)
     data_args.dataset_name = data_args.task_name
     data_args.eval_dataset_name = data_args.eval_dataset_name
     data_args.test_dataset_name = data_args.test_dataset_name
@@ -270,7 +270,7 @@ def main():
                                            seed=data_args.data_seed).get(
                 split="train",
                 split_validation_test=training_args.split_validation_test,
-                add_prefix=True if adapter_args.train_task_adapters else True,
+                add_prefix=False if adapter_args.train_task_adapters else True,
                 n_obs=data_args.max_train_samples, lang=data_args.lang_name, file_name=train_file, few_shot=data_args.few_shot)
                 for dataset_name, dataset_config_name, train_file
                 in zip(data_args.dataset_name, data_args.dataset_config_name, data_args.train_files)]
@@ -280,7 +280,7 @@ def main():
                                            seed=data_args.data_seed).get(
                 split="train",
                 split_validation_test=training_args.split_validation_test,
-                add_prefix=True if adapter_args.train_task_adapters else True,
+                add_prefix=False if adapter_args.train_task_adapters else True,
                 n_obs=data_args.max_train_samples, lang=data_args.lang_name, file_name=data_args.train_file, few_shot=data_args.few_shot)
                 for dataset_name, dataset_config_name
                 in zip(data_args.dataset_name, data_args.dataset_config_name)]
@@ -289,10 +289,9 @@ def main():
             tokenizer=tokenizer, default_max_length=data_args.max_target_length, )
             for dataset_name, dataset_config_name in zip(data_args.dataset_name, data_args.dataset_config_name)]
 
-        import random
-        for index in random.sample(range(len(train_datasets[0])), 3):
+        for index in random.sample(range(len(train_datasets[0])), 7):
             logger.info(f"Sample {index} of the training set: {train_datasets[0][index]}.")
-        exit(0)
+
         for i, train_dataset in enumerate(train_datasets):
             if model_args.shared_attn is True:
                 train_datasets[i] = train_datasets[i].map(
@@ -377,6 +376,8 @@ def main():
                 add_prefix=False if adapter_args.train_task_adapters else True,
                 n_obs=data_args.max_test_samples, lang=data_args.lang_name, file_name=data_args.test_file)
                 for test_dataset, test_dataset_config in zip(data_args.test_dataset_name, data_args.test_dataset_config_name)}
+        for index in random.sample(range(len(test_datasets[data_args.test_dataset_name[0]])), 3):
+            logger.info(f"Sample {index} of the test set: {test_datasets[data_args.test_dataset_name[0]][index]}.")
 
         max_target_lengths = [AutoTask.get(dataset_name, dataset_config_name).get_max_target_length(
             tokenizer=tokenizer, default_max_length=data_args.max_target_length)
@@ -490,9 +491,9 @@ def main():
             shared=model_args.shared_attn)
 
     # Saves training config.
-    if trainer.is_world_process_zero():
-        os.makedirs(training_args.output_dir, exist_ok=True)
-        save_training_config(sys.argv[1], training_args.output_dir)
+    # if trainer.is_world_process_zero():
+    #     os.makedirs(training_args.output_dir, exist_ok=True)
+    #     save_training_config(sys.argv[1], training_args.output_dir)
 
     # Training
     if training_args.do_train:
@@ -522,7 +523,8 @@ def main():
                          shared_attn=model_args.shared_attn, num_target=config.num_target, task_name=data_args.task_name)
         else:
             # save all model parameters and tokenizers regardless of whether they are updated or not.
-            trainer.save_model()
+            # trainer.save_model()
+            pass
 
         train_metrics = train_result.metrics
         max_train_samples = (
@@ -537,8 +539,9 @@ def main():
         if not model_args.save_prefix_only:
             trainer.save_state()
 
-        # torch.save(lora_state_dict(model), f'{training_args.output_dir}/lora.pt')
-        # print('save lora!!')
+        if adapter_args.train_lora:
+            torch.save(lora_state_dict(model), f'{training_args.output_dir}/lora.pt')
+            print('save lora!!')
 
     if torch.cuda.is_available() and training_args.compute_memory:
         peak_memory = (torch.cuda.max_memory_allocated() / 1024 ** 2)/1000

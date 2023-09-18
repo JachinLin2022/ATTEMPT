@@ -1,7 +1,7 @@
 {
     "do_test": true,
     "do_eval": true,
-    "do_train": false, 
+    "do_train": true, 
     "warmup_steps": 500,
     "save_steps": 1000,
     "save_strategy": "no",
@@ -15,13 +15,13 @@
     "non_linearity": "gelu_new",
     "max_source_length": 256,
     "learning_rate": 3e-4,
-    "output_dir": "outputs/lora",
-    "per_device_train_batch_size": 32,
-    "per_device_eval_batch_size": 32,
+    "output_dir": "outputs/lora_mnli_prefix",
+    "per_device_train_batch_size": 128,
+    "per_device_eval_batch_size": 256,
     "split_validation_test": true,
-    "task_name": ["mrpc"],
-    "eval_dataset_name": ["mrpc"], 
-    "test_dataset_name": ["mrpc"], 
+    "task_name": ["mnli"],
+    "eval_dataset_name": ["mnli"], 
+    "test_dataset_name": ["mnli"], 
     "num_train_epochs": 5,
     "dataset_config_name": ["en"],
     "eval_dataset_config_name": ["en"],
@@ -29,5 +29,6 @@
     "predict_with_generate": true,
     "compute_memory": true,
     "report_to": "wandb",
-    "train_lora": true
+    "train_lora": true,
+    "add_lora": true
     }
