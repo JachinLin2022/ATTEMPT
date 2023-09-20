@@ -112,7 +112,7 @@ class AbstractTask(abc.ABC):
         return dataset.select(indices)
 
     def load_dataset(self, split: int):
-        return datasets.load_dataset(self.name, self.config, split=split, script_version="master")
+        return datasets.load_dataset(self.name, self.config, split=split)
 
     def get_split_indices(self, split, dataset, validation_size):
         indices = self.shuffled_indices(dataset)
@@ -177,7 +177,7 @@ class Squad(AbstractTask):
     metric = [metrics.squad]
 
     def load_dataset(self, split):
-        return datasets.load_dataset(self.name, split=split, script_version="master")
+        return datasets.load_dataset(self.name, split=split)
 
     def preprocessor(self, example, add_prefix):
         answer = pad_punctuation(example['answers']).split("\t")
@@ -194,7 +194,7 @@ class DROP(AbstractTask):
     metric = [metrics.squad]
 
     def load_dataset(self, split):
-        return datasets.load_dataset("drop", split=split, script_version="master")
+        return datasets.load_dataset("drop", split=split)
 
     def preprocessor(self, example, add_prefix):
         answer = pad_punctuation(example['answers_spans']['spans'][0])
@@ -216,7 +216,7 @@ class PIQA(AbstractTask):
                            "test": "validation"}
 
     def load_dataset(self, split):
-        return datasets.load_dataset('piqa', split=split, script_version="master")
+        return datasets.load_dataset('piqa', split=split)
 
     def preprocessor(self, example, add_prefix=True):
         src_texts = ["question:", example['goal'], "choice1:",
@@ -234,7 +234,7 @@ class CommonsenseQA(AbstractTask):
                            "validation": "validation"}
 
     def load_dataset(self, split):
-        return datasets.load_dataset('commonsense_qa', split=split, script_version="master")
+        return datasets.load_dataset('commonsense_qa', split=split)
 
     def preprocessor(self, example, add_prefix=True):
         label2id = {"A": "0", "B": "1", "C": "2", "D": "3", "E": "4"}
@@ -253,7 +253,7 @@ class SocialIQA(AbstractTask):
                            "validation": "validation"}
 
     def load_dataset(self, split):
-        return datasets.load_dataset('social_i_qa', split=split, script_version="master")
+        return datasets.load_dataset('social_i_qa', split=split)
 
     def preprocessor(self, example, add_prefix=True):
         src_texts = ["question:", example['question'], "context:", example["context"], "|| choice0:",
@@ -272,7 +272,7 @@ class SciTail(AbstractTask):
                            "test": "test"}
 
     def load_dataset(self, split):
-        return datasets.load_dataset('scitail', "snli_format", split=split, script_version="master")
+        return datasets.load_dataset('scitail', "snli_format", split=split)
 
     def preprocessor(self, example, add_prefix=True):
         label2id = {"entailment": "0", "neutral": "1"}
@@ -285,6 +285,10 @@ class SciTail(AbstractTask):
 class MRPC(AbstractTask):
     name = "mrpc"
     labels_list = ["0", "1"]
+    labels_map = {
+        '0':'not_equivalent',
+        '1':'equivalent'
+    }
     metric = [metrics.f1_score_with_invalid, metrics.accuracy]
     metric_names = ["f1", "accuracy"]
     split_to_data_split = {"train": "train",
@@ -292,11 +296,12 @@ class MRPC(AbstractTask):
                            "test": "validation"}
 
     def load_dataset(self, split):
-        return datasets.load_dataset('glue', 'mrpc', split=split, script_version="master")
+        return datasets.load_dataset('glue', 'mrpc', split=split)
 
     def preprocessor(self, example, add_prefix=True):
         src_texts = ["sentence1:", example['sentence1'],
                      "sentence2:", example["sentence2"]]
+        # tgt_texts = [self.labels_map[str(example['label'])]]
         tgt_texts = [str(example['label'])]
         return self.seq2seq_format(src_texts, tgt_texts, add_prefix)
 
@@ -316,17 +321,21 @@ class COLA(AbstractTask):
 
     def load_dataset(self, split):
         return datasets.load_dataset('glue', 'cola',
-                                     split=split, script_version="master")
+                                     split=split)
 
     def preprocessor(self, example, add_prefix=True):
         src_texts = ["sentence:", example['sentence']]
-        tgt_texts = [self.labels_map[str(example['label'])]]
+        tgt_texts = [str(example['label'])]
         return self.seq2seq_format(src_texts, tgt_texts, add_prefix)
 
 
 class SST2(AbstractTask):
     name = "sst2"
     labels_list = ["0", "1"]
+    labels_map = {
+        '0':'negative',
+        '1':'positive'
+    }
     metric = [metrics.accuracy]
     metric_names = ["accuracy"]
     split_to_data_split = {"train": "train",
@@ -335,7 +344,7 @@ class SST2(AbstractTask):
 
     def load_dataset(self, split):
         return datasets.load_dataset('glue', 'sst2',
-                                     split=split, script_version="master")
+                                     split=split)
 
     def preprocessor(self, example, add_prefix=True):
         src_texts = ["sentence:", example['sentence']]
@@ -368,7 +377,7 @@ class Amazon_Polarity(AbstractTask):
     split_to_data_split = {"train": "train", "test": "test"}
 
     def load_dataset(self, split):
-        return datasets.load_dataset('yelp_polarity', split=split, script_version="master")
+        return datasets.load_dataset('yelp_polarity', split=split)
 
     def preprocessor(self, example, add_prefix=True):
         src_texts = ["sentence:", "<title> {0} <context> {1}".format(
@@ -389,7 +398,7 @@ class STSB(AbstractTask):
 
     def load_dataset(self, split):
         return datasets.load_dataset('glue', 'stsb',
-                                     split=split, script_version="master")
+                                     split=split)
 
     def preprocessor(self, example, add_prefix=True):
         src_texts = ["sentence1:", example['sentence1'],
@@ -401,6 +410,10 @@ class STSB(AbstractTask):
 class QQP(AbstractTask):
     name = "qqp"
     labels_list = ["0", "1"]
+    labels_map = {
+        '0':'not_duplicate',
+        '1':'duplicate'
+    }
     metric = [metrics.f1_score_with_invalid, metrics.accuracy]
     metric_names = ["f1", "accuracy"]
     split_to_data_split = {"train": "train",
@@ -409,7 +422,7 @@ class QQP(AbstractTask):
 
     def load_dataset(self, split):
         return datasets.load_dataset('glue', 'qqp',
-                                     split=split, script_version="master")
+                                     split=split)
 
     def preprocessor(self, example, add_prefix=True):
         src_texts = ["question1:", example['question1'],
@@ -433,12 +446,12 @@ class MNLI(AbstractTask):
     metric_names = ["accuracy"]
 
     def load_dataset(self, split):
-        return datasets.load_dataset('glue', 'mnli', split=split, script_version="master")
+        return datasets.load_dataset('glue', 'mnli', split=split)
 
     def preprocessor(self, example, add_prefix=True):
         src_texts = ["premise:", example['premise'],
                      "hypothesis:", example["hypothesis"]]
-        tgt_texts = [self.labels_map[str(example['label'])]]
+        tgt_texts = [str(example['label'])]
         return self.seq2seq_format(src_texts, tgt_texts, add_prefix)
 
 
@@ -452,7 +465,7 @@ class SNLI(AbstractTask):
     metric_names = ["accuracy"]
 
     def load_dataset(self, split):
-        return datasets.load_dataset('snli', split=split, script_version="master")
+        return datasets.load_dataset('snli', split=split)
 
     def preprocessor(self, example, add_prefix=True):
         src_texts = ["premise:", example['premise'],
@@ -471,7 +484,7 @@ class MultiNLI(AbstractTask):
     metric_names = ["accuracy"]
 
     def load_dataset(self, split):
-        return datasets.load_dataset('multi_nli', split=split, script_version="master")
+        return datasets.load_dataset('multi_nli', split=split)
 
     def preprocessor(self, example, add_prefix=True):
         src_texts = ["premise:", example['premise'],
@@ -494,18 +507,22 @@ class QNLI(AbstractTask):
                            "test": "validation"}
 
     def load_dataset(self, split):
-        return datasets.load_dataset('glue', 'qnli', split=split, script_version="master")
+        return datasets.load_dataset('glue', 'qnli', split=split)
 
     def preprocessor(self, example, add_prefix=True):
         src_texts = ["question:", example['question'],
                      "sentence:", example["sentence"]]
-        tgt_texts = [self.labels_map[str(example['label'])]]
+        tgt_texts = [str(example['label'])]
         return self.seq2seq_format(src_texts, tgt_texts, add_prefix)
 
 
 class RTE(AbstractTask):
     name = "rte"
     labels_list = ["0", "1"]
+    labels_map = {
+        '0':'entailment',
+        '1':'not_entailment'
+    }
     metric = [metrics.accuracy]
     metric_names = ["accuracy"]
     split_to_data_split = {"train": "train",
@@ -514,7 +531,7 @@ class RTE(AbstractTask):
 
     def load_dataset(self, split):
         return datasets.load_dataset('glue', 'rte',
-                                     split=split, script_version="master")
+                                     split=split)
 
     def preprocessor(self, example, add_prefix=True):
         src_texts = ["sentence1:", example['sentence1'],
@@ -537,18 +554,22 @@ class WNLI(AbstractTask):
                            "test": "validation"}
 
     def load_dataset(self, split):
-        return datasets.load_dataset('glue', 'wnli', split=split, script_version="master")
+        return datasets.load_dataset('glue', 'wnli', split=split)
 
     def preprocessor(self, example, add_prefix=True):
         src_texts = ["sentence1:", example['sentence1'],
                      "sentence2:", example["sentence2"]]
-        tgt_texts = [self.labels_map[str(example['label'])]]
+        tgt_texts = [str(example['label'])]
         return self.seq2seq_format(src_texts, tgt_texts, add_prefix)
 
 
 class SuperGLUEBoolQ(AbstractTask):
     name = "superglue-boolq"
     labels_list = ['0', '1']
+    labels_map = {
+        '0':'False',
+        '1':'True'
+    }
     metric = [metrics.accuracy]
     metric_names = ["accuracy"]
     split_to_data_split = {"train": "train",
@@ -556,7 +577,7 @@ class SuperGLUEBoolQ(AbstractTask):
                            "test": "validation"}
 
     def load_dataset(self, split):
-        return datasets.load_dataset('super_glue', 'boolq', split=split, script_version="master")
+        return datasets.load_dataset('super_glue', 'boolq', split=split)
 
     def preprocessor(self, example, add_prefix=True):
         src_texts = ["question:", example["question"],
@@ -568,6 +589,10 @@ class SuperGLUEBoolQ(AbstractTask):
 class SuperGLUERTE(AbstractTask):
     name = "superglue-rte"
     labels_list = ['0', '1']
+    labels_map = {
+        '0':'entailment',
+        '1':'not_entailment'
+    }
     split_to_data_split = {"train": "train",
                            "validation": "validation",
                            "test": "validation"}
@@ -575,7 +600,7 @@ class SuperGLUERTE(AbstractTask):
     metric_names = ["accuracy"]
 
     def load_dataset(self, split):
-        return datasets.load_dataset('super_glue', 'rte', split=split, script_version="master")
+        return datasets.load_dataset('super_glue', 'rte', split=split)
 
     def preprocessor(self, example, add_prefix=True):
         src_texts = ["premise:", example["premise"],
@@ -587,6 +612,11 @@ class SuperGLUERTE(AbstractTask):
 class SuperGLUECB(AbstractTask):
     name = "superglue-cb"
     labels_list = ['0', '1', '2']
+    labels_map = {
+        '0':'entailment',
+        '1':'contradiction',
+        '2':"neutral"
+    }
     split_to_data_split = {"train": "train",
                            "validation": "validation",
                            "test": "validation"}
@@ -594,7 +624,7 @@ class SuperGLUECB(AbstractTask):
     metric_names = ["f1_multiclass", "accuracy"]
 
     def load_dataset(self, split):
-        return datasets.load_dataset('super_glue', 'cb', split=split, script_version="master")
+        return datasets.load_dataset('super_glue', 'cb', split=split)
 
     def preprocessor(self, example, add_prefix=True):
         src_texts = ["premise:", example["premise"],
@@ -606,6 +636,10 @@ class SuperGLUECB(AbstractTask):
 class SuperGLUECOPA(AbstractTask):
     name = "superglue-copa"
     labels_list = ['0', '1']
+    labels_map = {
+        '0':'choice1',
+        '1':'choice2'
+    }
     split_to_data_split = {"train": "train",
                            "validation": "validation",
                            "test": "validation"}
@@ -613,7 +647,7 @@ class SuperGLUECOPA(AbstractTask):
     metric_names = ["accuracy"]
 
     def load_dataset(self, split):
-        return datasets.load_dataset('super_glue', 'copa', split=split, script_version="master")
+        return datasets.load_dataset('super_glue', 'copa', split=split)
 
     def preprocessor(self, example, add_prefix=True):
         src_texts = ["premise:", example["premise"],
@@ -626,6 +660,10 @@ class SuperGLUECOPA(AbstractTask):
 class SuperGLUEMultiRC(AbstractTask):
     name = "superglue-multirc"
     labels_list = ['0', '1']
+    labels_map = {
+        '0':'False',
+        '1':'True'
+    }
     split_to_data_split = {"train": "train",
                            "validation": "validation",
                            "test": "validation"}
@@ -634,7 +672,7 @@ class SuperGLUEMultiRC(AbstractTask):
     metric_names = ["f1", "em"]
 
     def load_dataset(self, split):
-        return datasets.load_dataset('super_glue', 'multirc', split=split, script_version="master")
+        return datasets.load_dataset('super_glue', 'multirc', split=split)
 
     def remove_markup(self, text):
         """Removes the HTML markup."""
@@ -657,6 +695,10 @@ class SuperGLUEMultiRC(AbstractTask):
 class SuperGLUEWIC(AbstractTask):
     name = "superglue-wic"
     labels_list = ['0', '1']
+    labels_map = {
+        '0':'False',
+        '1':'True'
+    }
     split_to_data_split = {"train": "train",
                            "validation": "validation",
                            "test": "validation"}
@@ -664,7 +706,7 @@ class SuperGLUEWIC(AbstractTask):
     metric_names = ["accuracy"]
 
     def load_dataset(self, split):
-        return datasets.load_dataset('super_glue', 'wic', split=split, script_version="master")
+        return datasets.load_dataset('super_glue', 'wic', split=split)
 
     def preprocessor(self, example, add_prefix=True):
         src_texts = ["sentence1:", example["sentence1"],
@@ -698,6 +740,10 @@ class SuperGLUEWSCFixed(AbstractTask):
     """
     name = "superglue-wsc.fixed"
     labels_list = ['0', '1']
+    labels_map = {
+        '0':'False',
+        '1':'True'
+    }
     split_to_data_split = {"train": "train",
                            "validation": "validation",
                            "test": "validation"}
@@ -705,7 +751,7 @@ class SuperGLUEWSCFixed(AbstractTask):
     metric_names = ["accuracy"]
 
     def load_dataset(self, split):
-        return datasets.load_dataset('super_glue', 'wsc.fixed', split=split, script_version="master")
+        return datasets.load_dataset('super_glue', 'wsc.fixed', split=split)
 
     def _mark_span(self, text, span_str, span_idx, mark):
         pattern_tmpl = r'^((?:\S+\s){N})(W)'
@@ -761,7 +807,7 @@ class SuperGLUERecord(AbstractTask):
     metric_names = ["squad"]
 
     def load_dataset(self, split):
-        return datasets.load_dataset('super_glue', 'record', split=split, script_version="master")
+        return datasets.load_dataset('super_glue', 'record', split=split)
 
     def preprocessor(self, batch, add_prefix=True):
         new_batch = collections.defaultdict(list)
@@ -802,7 +848,7 @@ class WinoGrande(AbstractTask):
     metric_names = ["accuracy"]
 
     def load_dataset(self, split):
-        return datasets.load_dataset('winogrande', "winogrande_xl", split=split, script_version="master")
+        return datasets.load_dataset('winogrande', "winogrande_xl", split=split)
 
     def preprocessor(self, example, add_prefix=True):
         src_texts = ["sentence:", example["sentence"],
@@ -822,7 +868,7 @@ class PAWS(AbstractTask):
                            "test": "test"}
 
     def load_dataset(self, split):
-        return datasets.load_dataset('paws', 'labeled_final', split=split, script_version="master")
+        return datasets.load_dataset('paws', 'labeled_final', split=split)
 
     def preprocessor(self, example, add_prefix=True):
         src_texts = ["sentence1:", example['sentence1'],
