@@ -16,7 +16,7 @@
 Fine-tuning the library models for sequence to sequence.
 """
 # You can also adapt this script on your own sequence to sequence task. Pointers for this are left as comments.
-from adapters.lora import lora_state_dict
+from adapters.lora import adapter_state_dict, lora_state_dict
 from utils import modify_model_after_init, save_training_config, save_prompts
 import shutil
 import glob
@@ -141,6 +141,8 @@ def main():
     config.fix_attention = model_args.fix_attention
     adapter_config = get_adapter_config(
         adapter_args, data_args, training_args, config)
+    config.lora_num = len(adapter_args.load_lora_path.split(',')) if adapter_args.load_lora_path else 1
+
 
     # Set tokenizer
     tokenizer = AutoTokenizer.from_pretrained(
@@ -213,13 +215,16 @@ def main():
     model.resize_token_embeddings(len(tokenizer))
     model:nn.Module = modify_model_after_init(
         model, training_args, adapter_args, adapter_config)
-    print(model)
+    # print(model)
     for n,p in model.named_parameters():
         if p.requires_grad:
-            print(n)
+            print(n,p.shape)
     for n,p in model.named_parameters():
         if 'lora' in n:
             print(n, p.requires_grad,p.shape)
+    # print(model.decoder.block[11].layer[2].DenseReluDense.wo.lora_B[0])
+    # print(model.decoder.block[11].layer[2].DenseReluDense.wo.lora_B[1])
+
     training_args.run_name = training_args.output_dir + '-' + ''.join(data_args.task_name)
     data_args.dataset_name = data_args.task_name
     data_args.eval_dataset_name = data_args.eval_dataset_name
@@ -270,7 +275,7 @@ def main():
                                            seed=data_args.data_seed).get(
                 split="train",
                 split_validation_test=training_args.split_validation_test,
-                add_prefix=False if adapter_args.train_task_adapters else True,
+                add_prefix=True if adapter_args.train_task_adapters else True,
                 n_obs=data_args.max_train_samples, lang=data_args.lang_name, file_name=train_file, few_shot=data_args.few_shot)
                 for dataset_name, dataset_config_name, train_file
                 in zip(data_args.dataset_name, data_args.dataset_config_name, data_args.train_files)]
@@ -280,7 +285,7 @@ def main():
                                            seed=data_args.data_seed).get(
                 split="train",
                 split_validation_test=training_args.split_validation_test,
-                add_prefix=False if adapter_args.train_task_adapters else True,
+                add_prefix=True if adapter_args.train_task_adapters else True,
                 n_obs=data_args.max_train_samples, lang=data_args.lang_name, file_name=data_args.train_file, few_shot=data_args.few_shot)
                 for dataset_name, dataset_config_name
                 in zip(data_args.dataset_name, data_args.dataset_config_name)]
@@ -289,8 +294,6 @@ def main():
             tokenizer=tokenizer, default_max_length=data_args.max_target_length, )
             for dataset_name, dataset_config_name in zip(data_args.dataset_name, data_args.dataset_config_name)]
 
-        for index in random.sample(range(len(train_datasets[0])), 7):
-            logger.info(f"Sample {index} of the training set: {train_datasets[0][index]}.")
 
         for i, train_dataset in enumerate(train_datasets):
             if model_args.shared_attn is True:
@@ -315,13 +318,16 @@ def main():
                 )
         train_dataset = concatenate_datasets(train_datasets)
 
+        for index in random.sample(range(len(train_dataset)), 7):
+            logger.info(f"Sample {index} of the training set: {train_dataset[index]}.")
+
     if training_args.do_eval:
         if data_args.validation_files is not None:
             eval_datasets = {eval_dataset: AutoTask.get(eval_dataset, eval_dataset_config,
                                                         seed=data_args.data_seed).get(
                 split="validation",
                 split_validation_test=training_args.split_validation_test,
-                add_prefix=False if adapter_args.train_task_adapters else True,
+                add_prefix=True if adapter_args.train_task_adapters else True,
                 n_obs=data_args.max_val_samples, lang=data_args.lang_name, file_name=validation_file)
                 for eval_dataset, eval_dataset_config, validation_file in zip(data_args.eval_dataset_name, data_args.eval_dataset_config_name, data_args.validation_files)}
         else:
@@ -329,7 +335,7 @@ def main():
                                                         seed=data_args.data_seed).get(
                 split="validation",
                 split_validation_test=training_args.split_validation_test,
-                add_prefix=False if adapter_args.train_task_adapters else True,
+                add_prefix=True if adapter_args.train_task_adapters else True,
                 n_obs=data_args.max_val_samples, lang=data_args.lang_name, file_name=data_args.validation_file)
                 for eval_dataset, eval_dataset_config in zip(data_args.eval_dataset_name, data_args.eval_dataset_config_name)}
 
@@ -365,7 +371,7 @@ def main():
                                                         seed=data_args.data_seed).get(
                 split="test",
                 split_validation_test=training_args.split_validation_test,
-                add_prefix=False if adapter_args.train_task_adapters else True,
+                add_prefix=True if adapter_args.train_task_adapters else True,
                 n_obs=data_args.max_test_samples, lang=data_args.lang_name, file_name=test_file)
                 for test_dataset, test_dataset_config, test_file in zip(data_args.test_dataset_name, data_args.test_dataset_config_name, data_args.test_files)}
         else:
@@ -373,7 +379,7 @@ def main():
                                                         seed=data_args.data_seed).get(
                 split="test",
                 split_validation_test=training_args.split_validation_test,
-                add_prefix=False if adapter_args.train_task_adapters else True,
+                add_prefix=True if adapter_args.train_task_adapters else True,
                 n_obs=data_args.max_test_samples, lang=data_args.lang_name, file_name=data_args.test_file)
                 for test_dataset, test_dataset_config in zip(data_args.test_dataset_name, data_args.test_dataset_config_name)}
         for index in random.sample(range(len(test_datasets[data_args.test_dataset_name[0]])), 3):
@@ -542,6 +548,9 @@ def main():
         if adapter_args.train_lora:
             torch.save(lora_state_dict(model), f'{training_args.output_dir}/lora.pt')
             print('save lora!!')
+        if adapter_args.train_task_adapters:
+            torch.save(adapter_state_dict(model), f'{training_args.output_dir}/adapter.pt')
+            print('save adapters!!')
 
     if torch.cuda.is_available() and training_args.compute_memory:
         peak_memory = (torch.cuda.max_memory_allocated() / 1024 ** 2)/1000

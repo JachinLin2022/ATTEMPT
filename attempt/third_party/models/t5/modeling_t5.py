@@ -267,23 +267,33 @@ class T5DenseReluDense(nn.Module):
     def __init__(self, config, adapter_config=None):
         super().__init__()
         self.bitfit = adapter_config.bitfit if adapter_config is not None else False
+        self.train_task_adapters = config.train_task_adapters and adapter_config.add_adapter_in_feed_forward_out
         if config.add_lora:
-            
-            self.wi = Linear(config.d_model, config.d_ff, 64, 64, 0, bias=False if not self.bitfit else True, merge_weights=False)
-            self.wo = Linear(config.d_ff, config.d_model, 64, 64, 0, bias=False if not self.bitfit else True, merge_weights=False)
+            self.wi = nn.Linear(config.d_model, config.d_ff,
+                            bias=False if not self.bitfit else True)
+            # self.wi = Linear(config.d_model, config.d_ff, 64, 64, 0, bias=False if not self.bitfit else True, merge_weights=False, lora_num=config.lora_num)
+            self.wo = Linear(config.d_ff, config.d_model, 64, 64, 0, bias=False if not self.bitfit else True, merge_weights=False, lora_num=config.lora_num)
         else:
+            if self.train_task_adapters:
+                adapter_config.reduction_factor = adapter_config.task_reduction_factor
+                adapter_config.input_dim = config.d_ff
+                self.adapter_controller = AdapterController(adapter_config)
             self.wi = nn.Linear(config.d_model, config.d_ff,
                             bias=False if not self.bitfit else True)
             self.wo = nn.Linear(config.d_ff, config.d_model,
                                 bias=False if not self.bitfit else True)
         self.dropout = nn.Dropout(config.dropout_rate)
 
-    def forward(self, hidden_states):
+    def forward(self, hidden_states, task=None):
+        if self.train_task_adapters:
+            residual = hidden_states
         hidden_states = self.wi(hidden_states)
         hidden_states = F.relu(hidden_states)
         hidden_states = self.dropout(hidden_states)
+        if self.train_task_adapters:
+            adapter_hidden_states = self.adapter_controller(hidden_states, task, residual)
         hidden_states = self.wo(hidden_states)
-        return hidden_states
+        return hidden_states + adapter_hidden_states
 
 
 class T5DenseGatedGeluDense(nn.Module):
@@ -331,7 +341,7 @@ class T5LayerFF(nn.Module):
 
     def forward(self, hidden_states, task_block_adapters=None, task=None):
         forwarded_states = self.layer_norm(hidden_states)
-        forwarded_states = self.DenseReluDense(forwarded_states)
+        forwarded_states = self.DenseReluDense(forwarded_states, task)
         if self.train_task_adapters:
             forwarded_states = self.adapter_controller(forwarded_states, task)
         hidden_states = hidden_states + self.dropout(forwarded_states)

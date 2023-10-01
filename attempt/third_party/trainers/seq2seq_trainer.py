@@ -6,7 +6,7 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 from torch.utils.data.dataset import Dataset
 from transformers import Seq2SeqTrainer
 from .trainer import BaseTrainer
-
+from adapters.lora import lora_state_dict
 if version.parse(torch.__version__) >= version.parse("1.6"):
     from torch.cuda.amp import autocast
 
@@ -18,6 +18,7 @@ class Seq2SeqTrainer(Seq2SeqTrainer, BaseTrainer):
         self.multiple_metrics = multiple_metrics
         self.train_dataset_sizes = train_dataset_sizes
         self.shared = shared
+        self.checkpoint_num = 0
 
     def evaluate(
         self,
@@ -28,7 +29,12 @@ class Seq2SeqTrainer(Seq2SeqTrainer, BaseTrainer):
         num_beams: Optional[int] = None,
     ) -> Dict[str, float]:
         self._max_length = max_length
-        self._num_beams = num_beams,
+        self._num_beams = num_beams
+        
+        # if 1:
+        #     self.checkpoint_num = self.checkpoint_num + 1
+        #     torch.save(lora_state_dict(self.model), f'{self.args.output_dir}/lora_{self.checkpoint_num}.pt')
+        #     print('save lora!!')
         return super().evaluate(eval_dataset, ignore_keys=ignore_keys, metric_key_prefix=metric_key_prefix)
 
     def prediction_step(

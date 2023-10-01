@@ -10,10 +10,11 @@ class Adapter(nn.Module):
         super().__init__()
         self.config = config
         self.input_dim = config.input_dim
+        self.output_dim = config.output_dim
         self.down_sample_size = self.input_dim // config.reduction_factor
         self.activation = Activations(config.non_linearity.lower())
         self.down_sampler = nn.Linear(self.input_dim, self.down_sample_size)
-        self.up_sampler = nn.Linear(self.down_sample_size, self.input_dim)
+        self.up_sampler = nn.Linear(self.down_sample_size, self.output_dim)
 
     def forward(self, x):
         z = self.down_sampler(x)

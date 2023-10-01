@@ -28,7 +28,7 @@ TASK_TO_METRICS = {"mrpc": ["accuracy", "f1"],
                    "superglue-copa": ["accuracy"],
                    "superglue-multirc": ["f1", "em"],
                    "superglue-wic": ["accuracy"],
-                   "superglue-wsc.fixed": ["accuracy"],
+                   "superglue-wsc-fixed": ["accuracy"],
                    "superglue-record": ["f1", "em"],
                    "multi_nli": ["accuracy"],
                    "squad": ["em", "f1"],
@@ -97,6 +97,12 @@ def f1_score_with_invalid(predictions, targets) -> dict:
     """
     def binary_reverse(labels):
         return ['0' if label == '1' else '1' for label in labels]
+    unique_labels = list(set(predictions + targets))
+    replace_dict = {label: index for index, label in enumerate(unique_labels)}
+
+    predictions = [replace_dict[x] for x in predictions]
+    targets = [replace_dict[x] for x in targets]
+
     targets, predictions = np.asarray(targets), np.asarray(predictions)
     # Get indices of invalid predictions.
     invalid_idx_mask = np.logical_and(predictions != '0', predictions != '1')

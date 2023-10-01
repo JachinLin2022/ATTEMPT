@@ -24,10 +24,11 @@ class AbstractTask(abc.ABC):
     metric_names = NotImplemented
     split_map = None
     labels_list = None
+    labels_map = None
     split_to_data_split: Mapping[str, str] = \
         {"train": "train", "validation": "validation", "test": "test"}
     small_datasets_without_all_splits = ["cola", "wnli", "rte", "superglue-cb", "superglue-copa", "superglue-multirc",
-                                         "superglue-wic", "superglue-wsc.fixed", "superglue-rte", "mrpc", "stsb",
+                                         "superglue-wic", "superglue-wsc-fixed", "superglue-rte", "mrpc", "stsb",
                                          "superglue-boolq", "xsum", "scitail"]
     large_data_without_all_splits = ["qqp", "qnli", "superglue-record", "sst2", "squad", "snli", "anli",
                                      "amazon_polarity", "yelp_polarity", "winogrande", "newsqa", "searchqa", "triviaqa", "nq", "hotpotqa"]
@@ -37,8 +38,17 @@ class AbstractTask(abc.ABC):
         self.seed = seed
 
     def get_max_target_length(self, tokenizer, default_max_length):
+        # dataset = self.load_dataset('train')
+        # from datasets import ClassLabel
+        # for key in dataset.features:
+        #     if isinstance(dataset.features[key],ClassLabel):
+        #         self.labels_list = dataset.features[key].names
+        #         print(self.labels_list)
+
         if self.labels_list is not None:
-            return max([len(tokenizer.encode(label)) for label in self.labels_list])
+            print(666622222)
+            return 8
+            # return max([len(tokenizer.encode(label)) for label in self.labels_list])
         return default_max_length
 
     def seq2seq_format(self, sources: List[str],
@@ -122,8 +132,13 @@ class AbstractTask(abc.ABC):
             return indices[validation_size:]
 
     def map_dataset(self, dataset, add_prefix):
+        from datasets import ClassLabel
+        for key in dataset.features:
+            if isinstance(dataset.features[key],ClassLabel):
+                self.labels_map = dataset.features[key].names
+        
         return dataset.map(functools.partial(self.preprocessor, add_prefix=add_prefix),
-                           remove_columns=dataset.column_names)
+                           remove_columns=dataset.column_names,num_proc=16)
 
     def get(self, split, add_prefix=True, n_obs=None, split_validation_test=False, lang=None, file_name=None, few_shot=None):
         # For small datasets (n_samples < 10K) without test set, we divide validation set to
@@ -284,12 +299,9 @@ class SciTail(AbstractTask):
 
 class MRPC(AbstractTask):
     name = "mrpc"
-    labels_list = ["0", "1"]
-    labels_map = {
-        '0':'not_equivalent',
-        '1':'equivalent'
-    }
-    metric = [metrics.f1_score_with_invalid, metrics.accuracy]
+    # labels_list = ["0", "1"]
+    labels_list = ['not_equivalent', 'equivalent']
+    metric = [metrics.accuracy]
     metric_names = ["f1", "accuracy"]
     split_to_data_split = {"train": "train",
                            "validation": "validation",
@@ -301,18 +313,13 @@ class MRPC(AbstractTask):
     def preprocessor(self, example, add_prefix=True):
         src_texts = ["sentence1:", example['sentence1'],
                      "sentence2:", example["sentence2"]]
-        # tgt_texts = [self.labels_map[str(example['label'])]]
-        tgt_texts = [str(example['label'])]
+        tgt_texts = [self.labels_map[int(example['label'])]]
         return self.seq2seq_format(src_texts, tgt_texts, add_prefix)
 
 
 class COLA(AbstractTask):
     name = "cola"
     labels_list = ["0", "1"]
-    labels_map = {
-        '0':'unacceptable',
-        '1':'acceptable'
-    }
     metric = [metrics.matthews_corrcoef]
     metric_names = ["matthews_correlation"]
     split_to_data_split = {"train": "train",
@@ -325,17 +332,13 @@ class COLA(AbstractTask):
 
     def preprocessor(self, example, add_prefix=True):
         src_texts = ["sentence:", example['sentence']]
-        tgt_texts = [str(example['label'])]
+        tgt_texts = [self.labels_map[int(example['label'])]]
         return self.seq2seq_format(src_texts, tgt_texts, add_prefix)
 
 
 class SST2(AbstractTask):
     name = "sst2"
     labels_list = ["0", "1"]
-    labels_map = {
-        '0':'negative',
-        '1':'positive'
-    }
     metric = [metrics.accuracy]
     metric_names = ["accuracy"]
     split_to_data_split = {"train": "train",
@@ -348,7 +351,7 @@ class SST2(AbstractTask):
 
     def preprocessor(self, example, add_prefix=True):
         src_texts = ["sentence:", example['sentence']]
-        tgt_texts = [str(example['label'])]
+        tgt_texts = [self.labels_map[int(example['label'])]]
         return self.seq2seq_format(src_texts, tgt_texts, add_prefix)
 
 
@@ -410,11 +413,7 @@ class STSB(AbstractTask):
 class QQP(AbstractTask):
     name = "qqp"
     labels_list = ["0", "1"]
-    labels_map = {
-        '0':'not_duplicate',
-        '1':'duplicate'
-    }
-    metric = [metrics.f1_score_with_invalid, metrics.accuracy]
+    metric = [metrics.accuracy]
     metric_names = ["f1", "accuracy"]
     split_to_data_split = {"train": "train",
                            "validation": "validation",
@@ -427,18 +426,13 @@ class QQP(AbstractTask):
     def preprocessor(self, example, add_prefix=True):
         src_texts = ["question1:", example['question1'],
                      "question2:", example["question2"]]
-        tgt_texts = [str(example['label'])]
+        tgt_texts = [self.labels_map[int(example['label'])]]
         return self.seq2seq_format(src_texts, tgt_texts, add_prefix)
 
 
 class MNLI(AbstractTask):
     name = "mnli"
     labels_list = ["0", "1", "2"]
-    labels_map = {
-        '0':'entailment',
-        '1':'neutral',
-        "2":"contradiction"
-    }
     split_to_data_split = {"train": "train",
                            "validation": "validation_mismatched",
                            "test": "validation_matched"}
@@ -451,7 +445,7 @@ class MNLI(AbstractTask):
     def preprocessor(self, example, add_prefix=True):
         src_texts = ["premise:", example['premise'],
                      "hypothesis:", example["hypothesis"]]
-        tgt_texts = [str(example['label'])]
+        tgt_texts = [self.labels_map[int(example['label'])]]
         return self.seq2seq_format(src_texts, tgt_texts, add_prefix)
 
 
@@ -496,10 +490,6 @@ class MultiNLI(AbstractTask):
 class QNLI(AbstractTask):
     name = "qnli"
     labels_list = ["0", "1"]
-    labels_map = {
-        '0':'entailment',
-        '1':'not_entailment'
-    }
     metric = [metrics.accuracy]
     metric_names = ["accuracy"]
     split_to_data_split = {"train": "train",
@@ -512,17 +502,13 @@ class QNLI(AbstractTask):
     def preprocessor(self, example, add_prefix=True):
         src_texts = ["question:", example['question'],
                      "sentence:", example["sentence"]]
-        tgt_texts = [str(example['label'])]
+        tgt_texts = [self.labels_map[int(example['label'])]]
         return self.seq2seq_format(src_texts, tgt_texts, add_prefix)
 
 
 class RTE(AbstractTask):
     name = "rte"
     labels_list = ["0", "1"]
-    labels_map = {
-        '0':'entailment',
-        '1':'not_entailment'
-    }
     metric = [metrics.accuracy]
     metric_names = ["accuracy"]
     split_to_data_split = {"train": "train",
@@ -536,17 +522,13 @@ class RTE(AbstractTask):
     def preprocessor(self, example, add_prefix=True):
         src_texts = ["sentence1:", example['sentence1'],
                      "sentence2:", example["sentence2"]]
-        tgt_texts = [str(example['label'])]
+        tgt_texts = [self.labels_map[int(example['label'])]]
         return self.seq2seq_format(src_texts, tgt_texts, add_prefix)
 
 
 class WNLI(AbstractTask):
     name = "wnli"
     labels_list = ["0", "1"]
-    labels_map = {
-        '0':'not_entailment',
-        '1':'entailment'
-    }
     metric = [metrics.accuracy]
     metric_names = ["accuracy"]
     split_to_data_split = {"train": "train",
@@ -559,17 +541,13 @@ class WNLI(AbstractTask):
     def preprocessor(self, example, add_prefix=True):
         src_texts = ["sentence1:", example['sentence1'],
                      "sentence2:", example["sentence2"]]
-        tgt_texts = [str(example['label'])]
+        tgt_texts = [self.labels_map[int(example['label'])]]
         return self.seq2seq_format(src_texts, tgt_texts, add_prefix)
 
 
 class SuperGLUEBoolQ(AbstractTask):
     name = "superglue-boolq"
     labels_list = ['0', '1']
-    labels_map = {
-        '0':'False',
-        '1':'True'
-    }
     metric = [metrics.accuracy]
     metric_names = ["accuracy"]
     split_to_data_split = {"train": "train",
@@ -582,17 +560,13 @@ class SuperGLUEBoolQ(AbstractTask):
     def preprocessor(self, example, add_prefix=True):
         src_texts = ["question:", example["question"],
                      "passage:", example["passage"]]
-        tgt_texts = [str(example["label"])]
+        tgt_texts = [self.labels_map[int(example['label'])]]
         return self.seq2seq_format(src_texts, tgt_texts, add_prefix)
 
 
 class SuperGLUERTE(AbstractTask):
     name = "superglue-rte"
     labels_list = ['0', '1']
-    labels_map = {
-        '0':'entailment',
-        '1':'not_entailment'
-    }
     split_to_data_split = {"train": "train",
                            "validation": "validation",
                            "test": "validation"}
@@ -605,22 +579,17 @@ class SuperGLUERTE(AbstractTask):
     def preprocessor(self, example, add_prefix=True):
         src_texts = ["premise:", example["premise"],
                      "hypothesis:", example["hypothesis"]]
-        tgt_texts = [str(example["label"])]
+        tgt_texts = [self.labels_map[int(example['label'])]]
         return self.seq2seq_format(src_texts, tgt_texts, add_prefix)
 
 
 class SuperGLUECB(AbstractTask):
     name = "superglue-cb"
     labels_list = ['0', '1', '2']
-    labels_map = {
-        '0':'entailment',
-        '1':'contradiction',
-        '2':"neutral"
-    }
     split_to_data_split = {"train": "train",
                            "validation": "validation",
                            "test": "validation"}
-    metric = [metrics.mean_multiclass_f1(num_classes=3), metrics.accuracy]
+    metric = [metrics.accuracy]
     metric_names = ["f1_multiclass", "accuracy"]
 
     def load_dataset(self, split):
@@ -629,17 +598,13 @@ class SuperGLUECB(AbstractTask):
     def preprocessor(self, example, add_prefix=True):
         src_texts = ["premise:", example["premise"],
                      "hypothesis:", example["hypothesis"]]
-        tgt_texts = [str(example["label"])]
+        tgt_texts = [self.labels_map[int(example['label'])]]
         return self.seq2seq_format(src_texts, tgt_texts, add_prefix)
 
 
 class SuperGLUECOPA(AbstractTask):
     name = "superglue-copa"
     labels_list = ['0', '1']
-    labels_map = {
-        '0':'choice1',
-        '1':'choice2'
-    }
     split_to_data_split = {"train": "train",
                            "validation": "validation",
                            "test": "validation"}
@@ -653,17 +618,13 @@ class SuperGLUECOPA(AbstractTask):
         src_texts = ["premise:", example["premise"],
                      "choice1:", example["choice1"],
                      "choice2:", example["choice2"]]
-        tgt_texts = [str(example["label"])]
+        tgt_texts = [self.labels_map[int(example['label'])]]
         return self.seq2seq_format(src_texts, tgt_texts, add_prefix)
 
 
 class SuperGLUEMultiRC(AbstractTask):
     name = "superglue-multirc"
     labels_list = ['0', '1']
-    labels_map = {
-        '0':'False',
-        '1':'True'
-    }
     split_to_data_split = {"train": "train",
                            "validation": "validation",
                            "test": "validation"}
@@ -688,17 +649,13 @@ class SuperGLUEMultiRC(AbstractTask):
         src_texts = ["question:", self.remove_markup(example["question"]),
                      "answer:", self.remove_markup(example["answer"]),
                      "paragraph:", self.remove_markup(example["paragraph"])]
-        tgt_texts = [str(example["label"])]
+        tgt_texts = [self.labels_map[int(example['label'])]]
         return self.seq2seq_format(src_texts, tgt_texts, add_prefix, extra_fields={"group": group})
 
 
 class SuperGLUEWIC(AbstractTask):
     name = "superglue-wic"
     labels_list = ['0', '1']
-    labels_map = {
-        '0':'False',
-        '1':'True'
-    }
     split_to_data_split = {"train": "train",
                            "validation": "validation",
                            "test": "validation"}
@@ -712,7 +669,7 @@ class SuperGLUEWIC(AbstractTask):
         src_texts = ["sentence1:", example["sentence1"],
                      "sentence2:", example["sentence2"],
                      "word:", example["word"]]
-        tgt_texts = [str(example["label"])]
+        tgt_texts = [self.labels_map[int(example['label'])]]
         return self.seq2seq_format(src_texts, tgt_texts, add_prefix)
 
 
@@ -738,12 +695,8 @@ class SuperGLUEWSCFixed(AbstractTask):
          'targets': 'False'
      }
     """
-    name = "superglue-wsc.fixed"
+    name = "superglue-wsc-fixed"
     labels_list = ['0', '1']
-    labels_map = {
-        '0':'False',
-        '1':'True'
-    }
     split_to_data_split = {"train": "train",
                            "validation": "validation",
                            "test": "validation"}
@@ -769,7 +722,7 @@ class SuperGLUEWSCFixed(AbstractTask):
             int(example['span1_index'] < example['span2_index'])
         text = self._mark_span(text, example['span2_text'], span2_index, '#')
         src_texts = ["text:", text]
-        tgt_texts = [str(example["label"])]
+        tgt_texts = [self.labels_map[int(example['label'])]]
         return self.seq2seq_format(src_texts, tgt_texts, add_prefix)
 
 
@@ -895,7 +848,7 @@ TASK_MAPPING = OrderedDict(
         ('superglue-copa', SuperGLUECOPA),
         ('superglue-multirc', SuperGLUEMultiRC),
         ('superglue-wic', SuperGLUEWIC),
-        ('superglue-wsc.fixed', SuperGLUEWSCFixed),
+        ('superglue-wsc-fixed', SuperGLUEWSCFixed),
         ('superglue-record', SuperGLUERecord),
         ('multi_nli', MultiNLI),
         ('snli', SNLI),

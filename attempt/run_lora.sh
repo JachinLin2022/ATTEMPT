@@ -18,7 +18,7 @@ greater_is_better=true
 evaluation_strategy="epoch"
 non_linearity="gelu_new"
 max_source_length=256
-learning_rate=3e-4
+learning_rate=5e-4
 split_validation_test=true
 task_name=("wnli")
 eval_dataset_name=("wnli")
@@ -34,10 +34,12 @@ report_to="wandb"
 train_lora=true
 add_lora=true
 target_task=(mrpc cola sst2 qnli wnli mnli qqp stsb superglue-boolq superglue-rte superglue-cb superglue-copa superglue-multirc superglue-wic superglue-wsc.fixed superglue-record)
-big_task=(mnli qnli qqp superglue-record)
+target_task=(qqp mnli qnli sst2 superglue-record)
+big_task=(mnli qnli qqp sst2 superglue-record)
 for task in ${target_task[@]}
 do
-    output_dir="outputs/lora_"$task
+    bash clean.sh
+    output_dir="outputs/lora2/lora_"$task
     t=($task)
     num_train_epochs=20
     if [[ "${big_task[@]}" =~ "${task}" ]]; then

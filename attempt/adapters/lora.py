@@ -87,6 +87,33 @@ class Embedding(nn.Embedding, LoRALayer):
             return nn.Embedding.forward(self, x)
             
 
+class MoeGating(nn.Module):
+    def __init__(self, emb_size, hid_size, num_models, num_layers, dropout):
+        super().__init__()
+        linear_models = []
+        linear_models.append(nn.Dropout(dropout))
+        linear_models.append(nn.Linear(emb_size, hid_size))
+        for _ in range(0, num_layers - 1):
+            linear_models.append(nn.ReLU())
+            linear_models.append(nn.Dropout(dropout))
+            linear_models.append(nn.Linear(hid_size, hid_size))
+        linear_models.append(nn.ReLU())
+        linear_models.append(nn.Dropout(dropout))
+        linear_models.append(nn.Linear(hid_size, num_models))
+        self.linear = nn.Sequential(*linear_models)
+        self.output = nn.Softmax(dim=-1)
+        
+    def forward(self, x):
+        if len(x.shape) == 3:
+            x = x[:, -1]
+            x = x.unsqueeze(1)
+        else:
+            x = x[-1]
+            x = x.unsqueeze(0)
+        hid_states = self.linear(x)
+        output = self.output(hid_states)
+        return output
+        
 class Linear(nn.Linear, LoRALayer):
     # LoRA implemented in a dense layer
     def __init__(
@@ -98,17 +125,38 @@ class Linear(nn.Linear, LoRALayer):
         lora_dropout: float = 0.,
         fan_in_fan_out: bool = False, # Set this to True if the layer to replace stores weight like (fan_in, fan_out)
         merge_weights: bool = True,
+        lora_num:int = 1,
         **kwargs
     ):
         nn.Linear.__init__(self, in_features, out_features, **kwargs)
         LoRALayer.__init__(self, r=r, lora_alpha=lora_alpha, lora_dropout=lora_dropout,
                            merge_weights=merge_weights)
-
+        self.lora_num = lora_num
         self.fan_in_fan_out = fan_in_fan_out
         # Actual trainable parameters
         if r > 0:
-            self.lora_A = nn.Parameter(self.weight.new_zeros((r, in_features)))
-            self.lora_B = nn.Parameter(self.weight.new_zeros((out_features, r)))
+            if lora_num == 1:
+                self.lora_A = nn.Parameter(self.weight.new_zeros((r, in_features)))
+                self.lora_B = nn.Parameter(self.weight.new_zeros((out_features, r)))
+            else:
+                self.lora_A = nn.ParameterList()
+                self.lora_B = nn.ParameterList()
+                for i in range(lora_num):
+                    self.lora_A.append(nn.Parameter(self.weight.new_zeros((r, in_features))))
+                    self.lora_B.append(nn.Parameter(self.weight.new_zeros((out_features, r))))
+
+                # gate network
+                # self.k = lora_num
+                # self.num_experts = lora_num
+                # self.noisy_gating = True
+                self.w_gate = nn.Parameter(torch.zeros(in_features, lora_num), requires_grad=True)
+                print(55555)
+                nn.init.kaiming_uniform_(self.w_gate, a=math.sqrt(5))
+                self.softplus = nn.Softplus()
+                self.softmax = nn.Softmax(dim=-1)
+                # self.register_buffer("mean", torch.tensor([0.0]))
+                # self.register_buffer("std", torch.tensor([1.0]))
+
             self.scaling = self.lora_alpha / self.r
             # Freezing the pre-trained weight matrix
             self.weight.requires_grad = False
@@ -120,8 +168,14 @@ class Linear(nn.Linear, LoRALayer):
         nn.Linear.reset_parameters(self)
         if hasattr(self, 'lora_A'):
             # initialize A the same way as the default for nn.Linear and B to zero
-            nn.init.kaiming_uniform_(self.lora_A, a=math.sqrt(5))
-            nn.init.zeros_(self.lora_B)
+            if self.lora_num == 1:
+                nn.init.kaiming_uniform_(self.lora_A, a=math.sqrt(5))
+                # nn.init.zeros_(self.lora_B)
+                nn.init.kaiming_uniform_(self.lora_B, a=math.sqrt(5))
+            else:
+                for i in range(self.lora_num):
+                    nn.init.kaiming_uniform_(self.lora_A[i], a=math.sqrt(5))
+                    nn.init.zeros_(self.lora_B[i])
 
     def train(self, mode: bool = True):
         def T(w):
@@ -140,12 +194,46 @@ class Linear(nn.Linear, LoRALayer):
                     self.weight.data += T(self.lora_B @ self.lora_A) * self.scaling
                 self.merged = True       
 
+   
+
     def forward(self, x: torch.Tensor):
         def T(w):
             return w.transpose(0, 1) if self.fan_in_fan_out else w
         if self.r > 0 and not self.merged:
-            result = F.linear(x, T(self.weight), bias=self.bias)            
-            result += (self.lora_dropout(x) @ self.lora_A.transpose(0, 1) @ self.lora_B.transpose(0, 1)) * self.scaling
+            result = F.linear(x, T(self.weight), bias=self.bias)
+            if self.lora_num == 1:         
+                result += (self.lora_dropout(x) @ self.lora_A.transpose(0, 1) @ self.lora_B.transpose(0, 1)) * self.scaling
+            else:
+                # gates, load = self.noisy_top_k_gating(x, self.training)
+                # importance = gates.sum(0)
+                gate_x = x[:,0,:].unsqueeze(1)
+
+                # gate = gate_x@self.w_gate
+                # gate = torch.nn.functional.softmax(gate.sum(0))
+                # for i in range(self.lora_num):
+                #     result += (self.lora_dropout(x) @ self.lora_A[i].transpose(0, 1) @ self.lora_B[i].transpose(0, 1)) * self.scaling * gate[i].item()
+                gete_out = gate_x @ self.w_gate
+
+                # gete_out[:,:,0] = 5 * gete_out[:,:,0]
+
+                max_index = torch.argmax(gete_out,dim=2)
+                gating_weights = torch.zeros_like(gete_out)
+                gating_weights.scatter_(2, max_index.unsqueeze(2), 1)
+                # gete_out[:,:,0] = gete_out[:,:,0] + 999999999
+                # gete_out[:,:,1:] = 0
+                # gating_weights = self.softmax(gete_out)
+                # print(gating_weights[0])
+                # print(gating_weights.shape)   
+
+                all_results = []
+                for i in range(self.lora_num):
+                    all_results.append((self.lora_dropout(x) @ self.lora_A[i].transpose(0, 1) @ self.lora_B[i].transpose(0, 1)) * self.scaling)
+                final_output = torch.stack(all_results, dim=3) @ gating_weights.unsqueeze(3)
+                final_output = final_output.squeeze()
+                if len(final_output.shape) == 2:
+                    final_output = final_output.unsqueeze(1)
+                result += final_output
+
             return result
         else:
             return F.linear(x, T(self.weight), bias=self.bias)
@@ -326,3 +414,10 @@ def lora_state_dict(model: nn.Module, bias: str = 'none') -> Dict[str, torch.Ten
     else:
         raise NotImplementedError
 
+
+def adapter_state_dict(model: nn.Module, bias: str = 'none') -> Dict[str, torch.Tensor]:
+    my_state_dict = model.state_dict()
+    if bias == 'none':
+        return {k: my_state_dict[k] for k in my_state_dict if 'adapters' in k}
+    else:
+        raise NotImplementedError

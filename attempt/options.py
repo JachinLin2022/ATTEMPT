@@ -15,6 +15,8 @@ class AdapterTrainingArguments:
     add_lora: Optional[bool] = field(default=False,
                                                 metadata={"help": "If set, adds lora in FFN."})
 
+    lora_num: Optional[int] = field(default=1,
+                                                metadata={"help": "If set, adds lora in FFN."})
     load_lora_path: Optional[str] = field(
         default=None, metadata={"help": "config name for the adapter layers, should be selected "
                                      f"in {sorted(ADAPTER_CONFIG_MAPPING.keys())}."}
@@ -84,6 +86,8 @@ class AdapterTrainingArguments:
     phm_init_range: Optional[float] = field(
         default=0.01, metadata={"help": "defines the phm init range."})
     add_adapter_in_feed_forward: Optional[bool] = field(
+        default=True, metadata={"help": "If set, adds adapters in the feed forward."})
+    add_adapter_in_feed_forward_out: Optional[bool] = field(
         default=True, metadata={"help": "If set, adds adapters in the feed forward."})
     add_adapter_in_self_attention: Optional[bool] = field(
         default=True, metadata={"help": "If set, adds adapters in the self attention"})
@@ -342,7 +346,7 @@ class DataTrainingArguments:
         default=False, metadata={"help": "Overwrite the cached training and evaluation sets"}
     )
     preprocessing_num_workers: Optional[int] = field(
-        default=None,
+        default=16,
         metadata={"help": "The number of processes to use for the preprocessing."},
     )
     max_source_length: Optional[int] = field(

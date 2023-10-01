@@ -17,6 +17,7 @@ class AdapterConfig(object):
     non_linearity: str = "swish"
     task_reduction_factor: int = 16
     add_adapter_in_feed_forward = True
+    add_adapter_in_feed_forward_out = True
     add_adapter_in_self_attention = True
     hidden_dim = 128
     task_adapter_layers_encoder = None

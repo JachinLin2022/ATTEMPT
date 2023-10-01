@@ -30,7 +30,7 @@ def get_adapter_config(adapter_args, data_args, training_args, config):
         adapter_config = AutoAdapterConfig.get(
             adapter_args.adapter_config_name)
         adapter_config.input_dim = config.d_model
-
+        adapter_config.output_dim = config.d_model
         if adapter_args.train_task_adapters:
             data_args.tasks = [data_args.task_name]
             adapter_config.tasks = data_args.tasks
@@ -74,6 +74,9 @@ def freeze_model_params(model, adapter_args, adapter_config):
             if isinstance(sub_module, (AdapterController, Adapter)):
                 for param_name, param in sub_module.named_parameters():
                     param.requires_grad = True
+        for n, p in model.named_parameters():
+            if 'gate' in n:
+                p.requires_grad = True
     # Unfreezes LoRA
     if adapter_args.train_lora:
         freeze_params(model)
@@ -209,9 +212,21 @@ def modify_model_after_init(model:nn.Module, training_args, adapter_args, adapte
     freeze_model_params(model, adapter_args, adapter_config)
     # load lora
     if adapter_args.add_lora and adapter_args.load_lora_path is not None:
-        print(f'load lora weight from:{adapter_args.load_lora_path}')
-        lora_dict = torch.load(adapter_args.load_lora_path)
-        model.load_state_dict(lora_dict, strict=False)
+        lora_list = adapter_args.load_lora_path.split(',')
+        if len(lora_list) == 1:
+            print(f'load lora weight from:{adapter_args.load_lora_path}')
+            lora_dict = torch.load(adapter_args.load_lora_path)
+            model.load_state_dict(lora_dict, strict=False)
+        else:
+            for i,path in enumerate(lora_list):
+                print(f'load lora weight from:{path}')
+                lora_dict = torch.load(path)
+                for key in list(lora_dict.keys()):
+                    # 创建新的键名
+                    new_key = key + f'.{i}'
+                    # 将原键对应的值赋给新键
+                    lora_dict[new_key] = lora_dict.pop(key)
+                model.load_state_dict(lora_dict, strict=False)
 
     trainable_params = sum(p.numel()
                            for p in model.parameters() if p.requires_grad)

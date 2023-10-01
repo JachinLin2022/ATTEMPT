@@ -85,7 +85,7 @@ class AdapterController(nn.Module):
         """
         return self.adapters[task]
 
-    def forward(self, inputs, task):
+    def forward(self, inputs, task, residual = None):
         """
         Retrieves the adapter layer corresponding to the given
         task. It freezes the adapter layers for all the other tasks
@@ -108,5 +108,8 @@ class AdapterController(nn.Module):
         outputs = adapter(z)
         if self.add_layer_norm_after_adapter:
             outputs = self.post_layer_norm(outputs)
-        outputs = outputs + inputs
+        if residual is not None:
+            outputs = outputs + residual
+        else:
+            outputs = outputs + inputs
         return outputs
