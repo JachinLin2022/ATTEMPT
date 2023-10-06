@@ -73,7 +73,8 @@ def freeze_model_params(model, adapter_args, adapter_config):
         for name, sub_module in model.named_modules():
             if isinstance(sub_module, (AdapterController, Adapter)):
                 for param_name, param in sub_module.named_parameters():
-                    param.requires_grad = True
+                    if param_name.find(adapter_config.tasks[0]) >= 0:
+                        param.requires_grad = True
         for n, p in model.named_parameters():
             if 'gate' in n:
                 p.requires_grad = True
@@ -227,6 +228,23 @@ def modify_model_after_init(model:nn.Module, training_args, adapter_args, adapte
                     # 将原键对应的值赋给新键
                     lora_dict[new_key] = lora_dict.pop(key)
                 model.load_state_dict(lora_dict, strict=False)
+
+    if adapter_args.load_adapter_path is not None:
+        adapter_list = adapter_args.load_adapter_path.split(',')
+        print(adapter_list)
+        if len(adapter_list) == 1:
+            print(f'load adapter weight from:{adapter_args.load_adapter_path}')
+            adapter_dict = torch.load(adapter_args.load_adapter_path)            
+            # print(adapter_dict['decoder.block.11.layer.2.DenseReluDense.adapter_controller.adapters.mnli.down_sampler.weight'])
+            model.load_state_dict(adapter_dict, strict=False)
+            # print(model.decoder.block[11].layer[2].DenseReluDense.adapter_controller.adapters.mnli.down_sampler.weight)
+        else:
+            for adapter in adapter_list:
+                print(f'load many adapter weight from:{adapter}')
+                adapter_dict = torch.load(adapter)
+                # print(adapter_dict['decoder.block.11.layer.2.DenseReluDense.adapter_controller.adapters.mnli.down_sampler.weight'])
+                model.load_state_dict(adapter_dict, strict=False)
+                # print(adapter_dict['decoder.block.11.layer.2.DenseReluDense.adapter_controller.adapters.mnli.down_sampler.weight'])
 
     trainable_params = sum(p.numel()
                            for p in model.parameters() if p.requires_grad)

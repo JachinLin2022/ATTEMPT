@@ -22,6 +22,11 @@ class AdapterTrainingArguments:
                                      f"in {sorted(ADAPTER_CONFIG_MAPPING.keys())}."}
     )
 
+    load_adapter_path: Optional[str] = field(
+        default=None, metadata={"help": "config name for the adapter layers, should be selected "
+                                     f"in {sorted(ADAPTER_CONFIG_MAPPING.keys())}."}
+    )
+
     adapter_config_name: Optional[str] = field(
         default="adapter", metadata={"help": "config name for the adapter layers, should be selected "
                                      f"in {sorted(ADAPTER_CONFIG_MAPPING.keys())}."}

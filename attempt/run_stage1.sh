@@ -87,7 +87,7 @@ do
         --train_task_adapters=true \
         --task_reduction_factor=16 \
         --unfreeze_lm_head=false \
-        --unfreeze_layer_norms=false \
+        --unfreeze_layer_norms=true \
         --add_adapter_in_feed_forward=false \
         --add_adapter_in_feed_forward_out=true \
         --add_adapter_in_self_attention=false \

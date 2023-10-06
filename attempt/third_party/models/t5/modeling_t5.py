@@ -267,6 +267,7 @@ class T5DenseReluDense(nn.Module):
     def __init__(self, config, adapter_config=None):
         super().__init__()
         self.bitfit = adapter_config.bitfit if adapter_config is not None else False
+        self.config = config
         self.train_task_adapters = config.train_task_adapters and adapter_config.add_adapter_in_feed_forward_out
         if config.add_lora:
             self.wi = nn.Linear(config.d_model, config.d_ff,
@@ -277,6 +278,8 @@ class T5DenseReluDense(nn.Module):
             if self.train_task_adapters:
                 adapter_config.reduction_factor = adapter_config.task_reduction_factor
                 adapter_config.input_dim = config.d_ff
+                # adapter_config.tasks = ['mnli']
+                adapter_config.tasks = config.source_task
                 self.adapter_controller = AdapterController(adapter_config)
             self.wi = nn.Linear(config.d_model, config.d_ff,
                             bias=False if not self.bitfit else True)
@@ -291,9 +294,13 @@ class T5DenseReluDense(nn.Module):
         hidden_states = F.relu(hidden_states)
         hidden_states = self.dropout(hidden_states)
         if self.train_task_adapters:
+            task = 'qnli'
+            # task = self.config.source_task[0]
             adapter_hidden_states = self.adapter_controller(hidden_states, task, residual)
+            hidden_states = self.wo(hidden_states)
+            return hidden_states + adapter_hidden_states
         hidden_states = self.wo(hidden_states)
-        return hidden_states + adapter_hidden_states
+        return hidden_states
 
 
 class T5DenseGatedGeluDense(nn.Module):
@@ -321,6 +328,7 @@ class T5DenseGatedGeluDense(nn.Module):
 class T5LayerFF(nn.Module):
     def __init__(self, config, adapter_config=None):
         super().__init__()
+        self.config = config
         if config.feed_forward_proj == "relu":
             self.DenseReluDense = T5DenseReluDense(
                 config, adapter_config=adapter_config)
@@ -334,6 +342,10 @@ class T5LayerFF(nn.Module):
         self.train_task_adapters = config.train_task_adapters and adapter_config.add_adapter_in_feed_forward
         if self.train_task_adapters:
             adapter_config.reduction_factor = adapter_config.task_reduction_factor
+            adapter_config.input_dim = config.d_model
+            adapter_config.output_dim = config.d_model
+            # adapter_config.tasks = ['rte']
+            adapter_config.tasks = config.target_task
             self.adapter_controller = AdapterController(adapter_config)
         self.layer_norm = T5LayerNorm(
             config.d_model, eps=config.layer_norm_epsilon, adapter_config=adapter_config)
@@ -343,6 +355,8 @@ class T5LayerFF(nn.Module):
         forwarded_states = self.layer_norm(hidden_states)
         forwarded_states = self.DenseReluDense(forwarded_states, task)
         if self.train_task_adapters:
+            # task = 'rte'
+            task = self.config.target_task[0]
             forwarded_states = self.adapter_controller(forwarded_states, task)
         hidden_states = hidden_states + self.dropout(forwarded_states)
         return hidden_states

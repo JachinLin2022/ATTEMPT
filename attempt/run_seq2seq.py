@@ -16,6 +16,7 @@
 Fine-tuning the library models for sequence to sequence.
 """
 # You can also adapt this script on your own sequence to sequence task. Pointers for this are left as comments.
+from unittest import case
 from adapters.lora import adapter_state_dict, lora_state_dict
 from utils import modify_model_after_init, save_training_config, save_prompts
 import shutil
@@ -118,6 +119,7 @@ def main():
     logger.info("Training/evaluation parameters %s", training_args)
 
     # Set seed before initializing model.
+    # training_args.seed = 30724
     set_seed(training_args.seed)
 
     # Load a model config
@@ -136,6 +138,17 @@ def main():
     config.shared_attn = model_args.shared_attn
     config.prefix_num = model_args.prefix_num
     config.num_target = len(data_args.task_name)
+    config.target_task = data_args.task_name
+    config.source_task = data_args.task_name
+    if adapter_args.load_adapter_path is not None:
+        source_list = []
+        for adapter in adapter_args.load_adapter_path.split(','):
+            if 'qnli' in adapter:
+                source_list.append('qnli')
+            if 'mnli' in adapter:
+                source_list.append('mnli')
+        config.source_task = source_list
+
     config.temperature = model_args.temperature
     config.learned_temperature = model_args.learned_temperature
     config.fix_attention = model_args.fix_attention
@@ -215,16 +228,15 @@ def main():
     model.resize_token_embeddings(len(tokenizer))
     model:nn.Module = modify_model_after_init(
         model, training_args, adapter_args, adapter_config)
-    # print(model)
+    print(model)
     for n,p in model.named_parameters():
         if p.requires_grad:
             print(n,p.shape)
     for n,p in model.named_parameters():
         if 'lora' in n:
             print(n, p.requires_grad,p.shape)
-    # print(model.decoder.block[11].layer[2].DenseReluDense.wo.lora_B[0])
-    # print(model.decoder.block[11].layer[2].DenseReluDense.wo.lora_B[1])
-
+    # print(model.decoder.block[11].layer[2].adapter_controller.adapters.rte.down_sampler.weight)
+    # exit(0)
     training_args.run_name = training_args.output_dir + '-' + ''.join(data_args.task_name)
     data_args.dataset_name = data_args.task_name
     data_args.eval_dataset_name = data_args.eval_dataset_name
