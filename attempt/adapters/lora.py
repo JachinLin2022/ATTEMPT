@@ -206,13 +206,20 @@ class Linear(nn.Linear, LoRALayer):
             else:
                 # gates, load = self.noisy_top_k_gating(x, self.training)
                 # importance = gates.sum(0)
+
+                # using token 0 as task vector
                 gate_x = x[:,0,:].unsqueeze(1)
+                gete_out = gate_x @ self.w_gate
+
+                # gete_out = (x @ self.w_gate).sum(dim=1).unsqueeze(1)
+
+
 
                 # gate = gate_x@self.w_gate
                 # gate = torch.nn.functional.softmax(gate.sum(0))
                 # for i in range(self.lora_num):
                 #     result += (self.lora_dropout(x) @ self.lora_A[i].transpose(0, 1) @ self.lora_B[i].transpose(0, 1)) * self.scaling * gate[i].item()
-                gete_out = gate_x @ self.w_gate
+                
 
                 # gete_out[:,:,0] = 5 * gete_out[:,:,0]
 

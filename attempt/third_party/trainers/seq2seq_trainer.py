@@ -31,10 +31,10 @@ class Seq2SeqTrainer(Seq2SeqTrainer, BaseTrainer):
         self._max_length = max_length
         self._num_beams = num_beams
         
-        if 1:
-            self.checkpoint_num = self.checkpoint_num + 1
-            torch.save(lora_state_dict(self.model), f'{self.args.output_dir}/adapter_{self.checkpoint_num}.pt')
-            print('save adapter!!')
+        # if 1:
+        #     self.checkpoint_num = self.checkpoint_num + 1
+        #     torch.save(lora_state_dict(self.model), f'{self.args.output_dir}/adapter_{self.checkpoint_num}.pt')
+        #     print('save adapter!!')
         return super().evaluate(eval_dataset, ignore_keys=ignore_keys, metric_key_prefix=metric_key_prefix)
 
     def prediction_step(

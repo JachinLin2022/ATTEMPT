@@ -19,9 +19,9 @@
     "learning_rate": 3e-4,
     "output_dir": "outputs/test",
     "split_validation_test": true,
-    "task_name": ["rte"], 
-    "eval_dataset_name": ["rte"],
-    "test_dataset_name": ["rte"],
+    "task_name": ["superglue-wic"], 
+    "eval_dataset_name": ["superglue-wic"],
+    "test_dataset_name": ["superglue-wic"],
     "num_train_epochs": 20,
     "dataset_config_name": ["en"],
     "eval_dataset_config_name": ["en"],
@@ -42,5 +42,5 @@
     "report_to": "none",
     "add_lora": true,
     "logging_steps": 10,
-    "load_lora_path": "/mlx_devbox/users/linzhisheng.2021/ATTEMPT/attempt/outputs/lora2/lora_mnli/lora.pt"
+    "load_lora_path": "/mlx_devbox/users/linzhisheng.2021/ATTEMPT/attempt/outputs/lora2/lora_mnli/lora.pt,/mlx_devbox/users/linzhisheng.2021/ATTEMPT/attempt/outputs/lora2/lora_qnli/lora.pt,/mlx_devbox/users/linzhisheng.2021/ATTEMPT/attempt/outputs/lora2/lora_qqp/lora.pt"
     }
