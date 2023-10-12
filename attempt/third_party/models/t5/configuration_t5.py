@@ -10,6 +10,10 @@ class T5Config(T5Config):
                  lora_num=1,
                  source_task = None,
                  target_task = None,
+                 add_task_embedding = None,
+                 task_embedding_len = None,
+                 task_embedding_init_token = None,
+                 load_task_path = None,
                  **kwargs):
         super().__init__(**kwargs)
         self.train_task_adapters = train_task_adapters
@@ -18,3 +22,9 @@ class T5Config(T5Config):
         self.lora_num = lora_num
         self.source_task = source_task
         self.target_task = target_task
+
+        # for task embedding
+        self.add_task_embedding = add_task_embedding
+        self.task_embedding_len = task_embedding_len
+        self.task_embedding_init_token = task_embedding_init_token
+        self.load_task_path = load_task_path

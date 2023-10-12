@@ -273,7 +273,7 @@ class T5DenseReluDense(nn.Module):
             self.wi = nn.Linear(config.d_model, config.d_ff,
                             bias=False if not self.bitfit else True)
             # self.wi = Linear(config.d_model, config.d_ff, 64, 64, 0, bias=False if not self.bitfit else True, merge_weights=False, lora_num=config.lora_num)
-            self.wo = Linear(config.d_ff, config.d_model, 64, 64, 0, bias=False if not self.bitfit else True, merge_weights=False, lora_num=config.lora_num)
+            self.wo = Linear(config.d_ff, config.d_model, 64, 64, 0, bias=False if not self.bitfit else True, merge_weights=False, lora_num=config.lora_num, task_prefix_len=config.task_embedding_len)
         else:
             if self.train_task_adapters:
                 adapter_config.reduction_factor = adapter_config.task_reduction_factor
@@ -852,6 +852,9 @@ class T5PreTrainedModel(PreTrainedModel):
             if hasattr(module, 'prefix_shared'):
                 if module.prefix_shared is not None:
                     self.init_prefix_weights()
+            if hasattr(module, 'task_shared'):
+                if module.task_shared is not None:
+                    self.init_task_weights()
         elif isinstance(module, T5DenseReluDense):
             # Mesh TensorFlow FF initialization
             # See https://github.com/tensorflow/mesh/blob/master/mesh_tensorflow/transformer/transformer_layers.py#L56
@@ -926,7 +929,7 @@ class T5PreTrainedModel(PreTrainedModel):
 
 
 class T5Stack(T5PreTrainedModel):
-    def __init__(self, config, embed_tokens=None, adapter_config=None, prefix_emb=None, attn_prefix_tuning=False, mul_prefix_emb=None, model_dim=768, attn_method="linear", shared_attn=False, ignore_target=False, temperature=2000, learned_temperature=False):
+    def __init__(self, config, embed_tokens=None, adapter_config=None, prefix_emb=None, attn_prefix_tuning=False, mul_prefix_emb=None, model_dim=768, attn_method="linear", shared_attn=False, ignore_target=False, temperature=2000, learned_temperature=False, task_emb = None, pretrain_task_emb_list = None):
         super().__init__(config)
 
         self.embed_tokens = embed_tokens
@@ -935,6 +938,8 @@ class T5Stack(T5PreTrainedModel):
         #######################################
         self.ignore_target = ignore_target
         self.prefix_emb = prefix_emb if self.ignore_target is False else None
+        self.task_emb = task_emb
+        self.pretrain_task_emb_list = pretrain_task_emb_list
         self.prefix_tuning = config.prefix_tuning
         self.attn_prefix_tuning = attn_prefix_tuning
         self.mul_prefix_emb = mul_prefix_emb
@@ -951,6 +956,7 @@ class T5Stack(T5PreTrainedModel):
         else:
             self.temperature = temperature
         self.append_prefix = self.prefix_tuning and not self.is_decoder and not self.attn_prefix_tuning
+        self.append_task_embeding = config.add_task_embedding and not self.is_decoder
         self.append_attn_prefix = self.prefix_tuning and not self.is_decoder and self.attn_prefix_tuning
         if self.prefix_tuning:
             self.prefix_dim = adapter_config.prefix_dim
@@ -1097,6 +1103,26 @@ class T5Stack(T5PreTrainedModel):
                 inputs_embeds = torch.cat([self.prefix_emb.unsqueeze(0).repeat(
                     inputs_embeds.shape[0], 1, 1), inputs_embeds], dim=1)  # bsz, seqlen, dim
                 input_shape = inputs_embeds.size()[:-1]
+
+            if self.append_task_embeding:
+                # attention
+
+                concat_embedding = self.task_emb
+                
+                if len(self.pretrain_task_emb_list) > 0:
+                    attention_embedding = torch.zeros_like(self.task_emb)
+                    for embedding in self.pretrain_task_emb_list:
+                        dot = torch.matmul(self.task_emb, embedding.transpose(0,1))
+                        prob = torch.nn.functional.softmax(dot,dim=-1)
+                        prob = torch.nn.functional.dropout(prob, p=0.1, training=self.training)
+                        o = torch.matmul(prob, embedding)
+                        attention_embedding = attention_embedding + o
+                    concat_embedding = attention_embedding
+
+                inputs_embeds = torch.cat([concat_embedding.unsqueeze(0).repeat(
+                    inputs_embeds.shape[0], 1, 1), inputs_embeds], dim=1)  # bsz, seqlen, dim
+                input_shape = inputs_embeds.size()[:-1]
+
 
             if self.append_attn_prefix:
                 avg_inputs_embeds, _ = torch.max(inputs_embeds, 1)
@@ -1738,12 +1764,26 @@ class T5ForConditionalGeneration(T5PreTrainedModel):
         self.shared = nn.Embedding(config.vocab_size, config.d_model)
         #############################################################
         self.prefix_tuning = config.prefix_tuning
+        self.add_task_embedding = config.add_task_embedding
+        self.task_embedding_len = config.task_embedding_len
+        self.load_task_path = config.load_task_path
         self.attn_prefix_tuning = config.attn_prefix_tuning
         self.attn_method = config.attn_method
         self.ignore_target = config.ignore_target
         if self.prefix_tuning:
             self.prefix_dim = adapter_config.prefix_dim
             self.init_prefix_from_vocab = adapter_config.init_prefix_from_vocab
+        self.task_shared = None
+        self.task_list = nn.ParameterList()
+        if self.add_task_embedding:
+            self.task_shared = nn.Parameter(torch.zeros((self.task_embedding_len, config.d_model)))
+            self.task_embedding_init_token = config.task_embedding_init_token
+            self.init_task_from_vocab = True
+            if self.load_task_path:
+                task_path_list = self.load_task_path.split(',')
+                for task_path in task_path_list:
+                    pretrain_embedding = torch.load(task_path)
+                    self.task_list.append(pretrain_embedding['task_shared'])
         self.shared_attn = config.shared_attn
         self.temperature = config.temperature
         self.learned_temperature = config.learned_temperature
@@ -1763,7 +1803,7 @@ class T5ForConditionalGeneration(T5PreTrainedModel):
         encoder_config.use_cache = False
         encoder_config.is_encoder_decoder = False
         self.encoder = T5Stack(encoder_config, self.shared, adapter_config=adapter_config, prefix_emb=self.prefix_shared, attn_prefix_tuning=self.attn_prefix_tuning, mul_prefix_emb=self.mul_prefix_emb,
-                               model_dim=config.d_model, attn_method=self.attn_method, shared_attn=self.shared_attn, ignore_target=self.ignore_target, temperature=self.temperature, learned_temperature=self.learned_temperature)
+                               model_dim=config.d_model, attn_method=self.attn_method, shared_attn=self.shared_attn, ignore_target=self.ignore_target, temperature=self.temperature, learned_temperature=self.learned_temperature, task_emb=self.task_shared, pretrain_task_emb_list=self.task_list)
 
         decoder_config = copy.deepcopy(config)
         decoder_config.is_decoder = True
@@ -1772,7 +1812,7 @@ class T5ForConditionalGeneration(T5PreTrainedModel):
         if config.train_task_adapters:
             decoder_config.train_task_adapters = adapter_config.task_adapter_in_decoder
         self.decoder = T5Stack(decoder_config, self.shared, adapter_config=adapter_config, prefix_emb=self.prefix_shared, attn_prefix_tuning=self.attn_prefix_tuning, mul_prefix_emb=self.mul_prefix_emb,
-                               model_dim=config.d_model, attn_method=self.attn_method, shared_attn=self.shared_attn, ignore_target=self.ignore_target, temperature=self.temperature, learned_temperature=self.learned_temperature)
+                               model_dim=config.d_model, attn_method=self.attn_method, shared_attn=self.shared_attn, ignore_target=self.ignore_target, temperature=self.temperature, learned_temperature=self.learned_temperature, task_emb=self.task_shared, pretrain_task_emb_list=self.task_list)
 
         self.bitfit = adapter_config.bitfit if adapter_config is not None else False
         self.lm_head = nn.Linear(
@@ -1795,6 +1835,16 @@ class T5ForConditionalGeneration(T5PreTrainedModel):
         else:
             random_range = 0.5
             self.prefix_shared.data.uniform_(-random_range, random_range)
+
+    def init_task_weights(self):
+        if self.init_task_from_vocab:
+            print('init_task_from_vocab')
+            init_weight = self.get_input_embeddings().state_dict()[
+                "weight"][self.task_embedding_init_token]
+            self.task_shared.data = init_weight.clone().detach()
+        else:
+            random_range = 0.5
+            self.task_shared.data.uniform_(-random_range, random_range)
 
     def store_prefix_weights(self, prefix_embeddings):
         # need to pass them as a parameter?
@@ -1958,6 +2008,11 @@ class T5ForConditionalGeneration(T5PreTrainedModel):
             if attention_mask is not None:
                 attention_mask = torch.cat([torch.ones((attention_mask.shape[0], self.prefix_dim)).to(
                     attention_mask.device), attention_mask], dim=1)
+        
+        if self.add_task_embedding:
+            if attention_mask is not None:
+                attention_mask = torch.cat([torch.ones((attention_mask.shape[0], self.task_embedding_len)).to(
+                    attention_mask.device), attention_mask], dim=1)
 
         # Encode if needed (training, first prediction pass)
         if encoder_outputs is None:
@@ -2084,6 +2139,13 @@ class T5ForConditionalGeneration(T5PreTrainedModel):
                 if attention_mask is not None:
                     encoder_kwargs['attention_mask'] = torch.cat([torch.ones(
                         (attention_mask.shape[0], self.prefix_dim)).to(attention_mask.device), attention_mask], dim=1)
+
+            if self.add_task_embedding:
+                attention_mask = encoder_kwargs['attention_mask']
+                if attention_mask is not None:
+                    encoder_kwargs['attention_mask'] = torch.cat([torch.ones(
+                        (attention_mask.shape[0], self.task_embedding_len)).to(attention_mask.device), attention_mask], dim=1)
+
             model_kwargs["encoder_outputs"]: ModelOutput = encoder(
                 input_ids, return_dict=True, **encoder_kwargs)
         return model_kwargs

@@ -9,6 +9,10 @@ class AdapterTrainingArguments:
     """Defines the adapters parameters."""
     train_task_adapters: Optional[bool] = field(default=False,
                                                 metadata={"help": "If set, adds task adapters in the model."})
+
+    add_task_embedding: Optional[bool] = field(default=False,
+                                                metadata={"help": "If set, add_task_embedding"})
+
     train_lora: Optional[bool] = field(default=False,
                                                 metadata={"help": "If set, train lora in FFN."})
 
@@ -20,6 +24,10 @@ class AdapterTrainingArguments:
     load_lora_path: Optional[str] = field(
         default=None, metadata={"help": "config name for the adapter layers, should be selected "
                                      f"in {sorted(ADAPTER_CONFIG_MAPPING.keys())}."}
+    )
+
+    load_task_path: Optional[str] = field(
+        default=None, metadata={"help": "task path"}
     )
 
     load_adapter_path: Optional[str] = field(

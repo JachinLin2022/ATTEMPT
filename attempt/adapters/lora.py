@@ -126,6 +126,7 @@ class Linear(nn.Linear, LoRALayer):
         fan_in_fan_out: bool = False, # Set this to True if the layer to replace stores weight like (fan_in, fan_out)
         merge_weights: bool = True,
         lora_num:int = 1,
+        task_prefix_len:int = 1,
         **kwargs
     ):
         nn.Linear.__init__(self, in_features, out_features, **kwargs)
@@ -133,6 +134,7 @@ class Linear(nn.Linear, LoRALayer):
                            merge_weights=merge_weights)
         self.lora_num = lora_num
         self.fan_in_fan_out = fan_in_fan_out
+        self.task_prefix_len = 1 if task_prefix_len is None else task_prefix_len
         # Actual trainable parameters
         if r > 0:
             if lora_num == 1:
@@ -150,9 +152,8 @@ class Linear(nn.Linear, LoRALayer):
                 # self.num_experts = lora_num
                 # self.noisy_gating = True
                 self.w_gate = nn.Parameter(torch.zeros(in_features, lora_num), requires_grad=True)
-                print(55555)
                 nn.init.kaiming_uniform_(self.w_gate, a=math.sqrt(5))
-                self.softplus = nn.Softplus()
+                # self.softplus = nn.Softplus()
                 self.softmax = nn.Softmax(dim=-1)
                 # self.register_buffer("mean", torch.tensor([0.0]))
                 # self.register_buffer("std", torch.tensor([1.0]))
@@ -208,7 +209,12 @@ class Linear(nn.Linear, LoRALayer):
                 # importance = gates.sum(0)
 
                 # using token 0 as task vector
-                gate_x = x[:,0,:].unsqueeze(1)
+                # print(self.task_prefix_len)
+
+                if x.shape[1] > self.task_prefix_len:
+                    gate_x = x[:,:self.task_prefix_len,:].mean(1).unsqueeze(1)
+                else:
+                    gate_x = x[:,0,:].unsqueeze(1)
                 gete_out = gate_x @ self.w_gate
 
                 # gete_out = (x @ self.w_gate).sum(dim=1).unsqueeze(1)
@@ -221,14 +227,13 @@ class Linear(nn.Linear, LoRALayer):
                 #     result += (self.lora_dropout(x) @ self.lora_A[i].transpose(0, 1) @ self.lora_B[i].transpose(0, 1)) * self.scaling * gate[i].item()
                 
 
-                # gete_out[:,:,0] = 5 * gete_out[:,:,0]
+                # max_index = torch.argmax(gete_out,dim=2)
+                # gating_weights = torch.zeros_like(gete_out)
+                # gating_weights.scatter_(2, max_index.unsqueeze(2), 1)
 
-                max_index = torch.argmax(gete_out,dim=2)
-                gating_weights = torch.zeros_like(gete_out)
-                gating_weights.scatter_(2, max_index.unsqueeze(2), 1)
                 # gete_out[:,:,0] = gete_out[:,:,0] + 999999999
                 # gete_out[:,:,1:] = 0
-                # gating_weights = self.softmax(gete_out)
+                gating_weights = self.softmax(gete_out)
                 # print(gating_weights[0])
                 # print(gating_weights.shape)   
 
@@ -421,6 +426,12 @@ def lora_state_dict(model: nn.Module, bias: str = 'none') -> Dict[str, torch.Ten
     else:
         raise NotImplementedError
 
+def task_embedding_state_dict(model: nn.Module, bias: str = 'none') -> Dict[str, torch.Tensor]:
+    my_state_dict = model.state_dict()
+    if bias == 'none':
+        return {k: my_state_dict[k] for k in my_state_dict if 'task_shared' in k}
+    else:
+        raise NotImplementedError
 
 def adapter_state_dict(model: nn.Module, bias: str = 'none') -> Dict[str, torch.Tensor]:
     my_state_dict = model.state_dict()

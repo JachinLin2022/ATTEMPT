@@ -78,12 +78,21 @@ def freeze_model_params(model, adapter_args, adapter_config):
         for n, p in model.named_parameters():
             if 'gate' in n:
                 p.requires_grad = True
+        if adapter_args.add_task_embedding:
+            for n, p in model.named_parameters():
+                if 'task_shared' in n:
+                    p.requires_grad = True
+                # if 'task_list' in n:
+                #     p.requires_grad = True
     # Unfreezes LoRA
     if adapter_args.train_lora:
         freeze_params(model)
         for n, p in model.named_parameters():
             if 'lora_' in n:
                 p.requires_grad = True
+            if adapter_args.add_task_embedding:
+                if 'task_shared' in n:
+                    p.requires_grad = True
 
     # Unfreezes last linear layer of decoder.
     if adapter_args.unfreeze_lm_head:
@@ -206,6 +215,39 @@ def pad_punctuation(text):
     # Collapse consecutive whitespace into one space.
     text = re.sub(r'\s+', ' ', text)
     return text
+
+
+def init_task_param(config, tokenizer):
+    print('init task param')
+    task = config.target_task[0]
+    # task_desc_map = {
+    #     'qnli': 'Given a question and a context sentence, the task is to determine whether the context sentence contains the answer to the question.',
+    #     'cola': 'Given a sentence, the task is to judge the grammatical acceptability of the sentence.',
+    #     'mnli': 'Given a premise sentence and a hypothesis sentence, the task is to predict whether the premise entails the hypothesis (entailment), contradicts the hypothesis (contradiction), or neither (neutral).',
+    #     'qqp': 'Given two questions, the task is to determine whether two given questions have the same intent or meaning.',
+    #     'superglue-cb': 'Given a premise and a hypothesis, the task is to determine the type and strength of the commitment being expressed.',
+    #     'rte': 'Given a premise sentence and a hypothesis sentence, the task is to determine whether the hypothesis can be inferred from the premise.'
+    #     ''
+    # }
+    task_desc_map = {
+        "qnli": "Given a question and a context sentence, the task is to determine whether the context sentence contains the answer to the question.",
+        "mnli": "Given a premise sentence and a hypothesis sentence, the task is to predict whether the premise entails the hypothesis, contradicts the hypothesis, or neither.",
+        "qqp": "Given a pair of sentences, the task is to determine if the two sentences are semantically equivalent or not.",
+        "cola": "Given a sentence, the task is to judge the grammatical acceptability of the sentence.",
+        "rte": "Given a premise sentence and a hypothesis sentence, the task is to determine whether the hypothesis can be inferred from the premise.",
+        "qqp": "Given two questions, the task is to determine whether the two questions have the same intent or meaning.",
+        "mrpc": "Given a pair of sentences, the task is to determine whether the two sentences are semantically equivalent or not.",
+        "stsb": "Given a pair of sentences, the task is to measure the degree of semantic similarity or relatedness between pairs of sentences.",
+        "superglue-cb": "Given a premise and a hypothesis, the task is to determine the type and strength of the commitment being expressed.",
+        "superglue-wic": "Given a target word and a pair of sentences, the task is to determine if the target word has the same meaning in two different contexts.",
+        "superglue-wsc-fixed": "Given a set of sentences that contain an ambiguous pronoun, the task is to determine the referent of the ambiguous pronoun based on the context provided.",
+        "superglue-boolq": "Given a question and a paragraph, the task is to determine if the question can be answered with a simple 'true' or 'false' based on the given passage of text.",
+        "superglue-multirc": "Given a passage of text and a set of multiple-choice questions, the task is to select the correct answer choice for each question based on the information provided in the passage."
+    }
+    task_token_id = tokenizer(task_desc_map[task])['input_ids']
+    config.task_embedding_len = len(task_token_id)
+    config.task_embedding_init_token = task_token_id
+    print(f"task embedding len={config.task_embedding_len}, token={task_token_id}")
 
 
 def modify_model_after_init(model:nn.Module, training_args, adapter_args, adapter_config):

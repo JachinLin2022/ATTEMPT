@@ -15,7 +15,7 @@
     "overwrite_output_dir": true,
     "init_prefix_from_vocab": true,
     "prefix_tuning": true,
-    "prefix_dim": 300,
+    "prefix_dim": 100,
     "max_source_length": 256,
     "learning_rate": 3e-1,
     "output_dir": "outputs/prompt_tuning",
@@ -31,6 +31,7 @@
     "test_dataset_config_name": ["en"],
     "predict_with_generate": true,
     "save_prefix_only": true,
+    "report_to": "none",
     "weight_decay": 1e-5,
     "compute_memory": true
     }

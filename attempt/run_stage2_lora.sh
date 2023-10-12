@@ -108,7 +108,7 @@ target_task=(superglue-multirc superglue-cb superglue-wsc-fixed superglue-boolq 
 #     done
 # done
 
-target_task=(superglue-wic)
+target_task=(superglue-multirc)
 # lora moe，不同lr
 for learning_rate in ${lrs[@]}
 do
@@ -118,7 +118,7 @@ do
         t=($task)
         num_train_epochs=20
         warmup_steps=0
-        per_device_train_batch_size=32
+        per_device_train_batch_size=128
         max_source_length=256
         if [[ "${big_task[@]}" =~ "${task}" ]]; then
             num_train_epochs=10

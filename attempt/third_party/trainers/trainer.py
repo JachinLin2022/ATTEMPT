@@ -90,10 +90,10 @@ class BaseTrainer(Trainer):
         # self._memory_tracker.start()
         eval_dataloader = self.get_eval_dataloader(eval_dataset)
         start_time = time.time()
-        print(self.multi_task_compute_metrics)
+        # print(self.multi_task_compute_metrics)
         if task_name is not None:
             self.compute_metrics = self.multi_task_compute_metrics[task_name]
-        print(self.compute_metrics)
+        # print(self.compute_metrics)
         eval_loop = self.prediction_loop if self.args.use_legacy_prediction_loop else self.evaluation_loop
         output = eval_loop(
             eval_dataloader,
@@ -288,6 +288,7 @@ class BaseTrainer(Trainer):
         if all_losses is not None:
             metrics[f"{metric_key_prefix}_loss"] = all_losses.mean().item()
 
+        metrics["moe_weight"] = [0.5,0.5,0]
         # Prefix all keys with metric_key_prefix + '_'
         for key in list(metrics.keys()):
             if not key.startswith(f"{metric_key_prefix}_"):

@@ -16,9 +16,10 @@
 Fine-tuning the library models for sequence to sequence.
 """
 # You can also adapt this script on your own sequence to sequence task. Pointers for this are left as comments.
-from unittest import case
-from adapters.lora import adapter_state_dict, lora_state_dict
-from utils import modify_model_after_init, save_training_config, save_prompts
+import os
+os.environ['CUDA_VISIBLE_DEVICES'] = '0,1'
+from adapters.lora import adapter_state_dict, lora_state_dict, task_embedding_state_dict
+from utils import modify_model_after_init, save_training_config, save_prompts, init_task_param
 import shutil
 import glob
 from data import AutoPostProcessor
@@ -155,8 +156,8 @@ def main():
     adapter_config = get_adapter_config(
         adapter_args, data_args, training_args, config)
     config.lora_num = len(adapter_args.load_lora_path.split(',')) if adapter_args.load_lora_path else 1
-
-
+    config.add_task_embedding = adapter_args.add_task_embedding
+    config.load_task_path = adapter_args.load_task_path
     # Set tokenizer
     tokenizer = AutoTokenizer.from_pretrained(
         model_args.tokenizer_name if model_args.tokenizer_name else model_args.model_name_or_path,
@@ -165,6 +166,12 @@ def main():
         revision=model_args.model_revision,
         use_auth_token=True if model_args.use_auth_token else None,
     )
+
+    # set task embedding param
+    if config.add_task_embedding:
+        init_task_param(config, tokenizer)
+        # data_args.max_source_length = data_args.max_source_length + config.task_embedding_len
+        # print('After add task embedding, max length is ', data_args.max_source_length)
 
     # Initialize the model
     model = T5ForConditionalGeneration.from_pretrained(
@@ -231,12 +238,11 @@ def main():
     print(model)
     for n,p in model.named_parameters():
         if p.requires_grad:
-            print(n,p.shape)
+            print(n,p.requires_grad,p.shape)
     for n,p in model.named_parameters():
         if 'lora' in n:
             print(n, p.requires_grad,p.shape)
     # print(model.decoder.block[11].layer[2].adapter_controller.adapters.rte.down_sampler.weight)
-    # exit(0)
     training_args.run_name = training_args.output_dir + '-' + ''.join(data_args.task_name)
     data_args.dataset_name = data_args.task_name
     data_args.eval_dataset_name = data_args.eval_dataset_name
@@ -563,6 +569,9 @@ def main():
         if adapter_args.train_task_adapters:
             torch.save(adapter_state_dict(model), f'{training_args.output_dir}/adapter.pt')
             print('save adapters!!')
+        if adapter_args.add_task_embedding:
+            torch.save(task_embedding_state_dict(model), f'{training_args.output_dir}/task_embedding.pt')
+            print('save task_embedding!!')
 
     if torch.cuda.is_available() and training_args.compute_memory:
         peak_memory = (torch.cuda.max_memory_allocated() / 1024 ** 2)/1000
