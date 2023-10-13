@@ -269,6 +269,7 @@ class T5DenseReluDense(nn.Module):
         self.bitfit = adapter_config.bitfit if adapter_config is not None else False
         self.config = config
         self.train_task_adapters = config.train_task_adapters and adapter_config.add_adapter_in_feed_forward_out
+        self.add_lora = config.add_lora
         if config.add_lora:
             self.wi = nn.Linear(config.d_model, config.d_ff,
                             bias=False if not self.bitfit else True)
@@ -287,7 +288,7 @@ class T5DenseReluDense(nn.Module):
                                 bias=False if not self.bitfit else True)
         self.dropout = nn.Dropout(config.dropout_rate)
 
-    def forward(self, hidden_states, task=None):
+    def forward(self, hidden_states, task=None, moe_output=None):
         if self.train_task_adapters:
             residual = hidden_states
         hidden_states = self.wi(hidden_states)
@@ -299,7 +300,10 @@ class T5DenseReluDense(nn.Module):
             adapter_hidden_states = self.adapter_controller(hidden_states, task, residual)
             hidden_states = self.wo(hidden_states)
             return hidden_states + adapter_hidden_states
-        hidden_states = self.wo(hidden_states)
+        if self.add_lora:
+            hidden_states = self.wo(hidden_states, moe_output)
+        else:
+            hidden_states = self.wo(hidden_states)
         return hidden_states
 
 
@@ -351,9 +355,9 @@ class T5LayerFF(nn.Module):
             config.d_model, eps=config.layer_norm_epsilon, adapter_config=adapter_config)
         self.dropout = nn.Dropout(config.dropout_rate)
 
-    def forward(self, hidden_states, task_block_adapters=None, task=None):
+    def forward(self, hidden_states, task_block_adapters=None, task=None, moe_output=None):
         forwarded_states = self.layer_norm(hidden_states)
-        forwarded_states = self.DenseReluDense(forwarded_states, task)
+        forwarded_states = self.DenseReluDense(forwarded_states, task, moe_output)
         if self.train_task_adapters:
             # task = 'rte'
             task = self.config.target_task[0]
@@ -720,7 +724,8 @@ class T5Block(nn.Module):
         output_attentions=False,
         return_dict=True,
         task_block_adapters=None,
-        task=None
+        task=None,
+        moe_output=None
     ):
 
         if past_key_value is not None:
@@ -799,7 +804,7 @@ class T5Block(nn.Module):
         # Apply Feed Forward layer
         hidden_states = self.layer[-1](hidden_states,
                                        task_block_adapters=task_block_adapters,
-                                       task=task)
+                                       task=task, moe_output=moe_output)
 
         # clamp inf values to enable fp16 training
         if hidden_states.dtype == torch.float16 and torch.isinf(hidden_states).any():
@@ -1067,7 +1072,8 @@ class T5Stack(T5PreTrainedModel):
         return_dict=None,
         task_embedding=None,
         task_ids=None,
-        task=None
+        task=None,
+        moe_output=None,
     ):
         # Model parallel
         if self.model_parallel:
@@ -1327,7 +1333,8 @@ class T5Stack(T5PreTrainedModel):
                     past_key_value=past_key_value,
                     use_cache=use_cache,
                     output_attentions=output_attentions,
-                    task=task
+                    task=task,
+                    moe_output=moe_output
                 )
 
             # layer_outputs is a tuple with:
@@ -1782,6 +1789,7 @@ class T5ForConditionalGeneration(T5PreTrainedModel):
             if self.load_task_path:
                 task_path_list = self.load_task_path.split(',')
                 for task_path in task_path_list:
+                    print('load task from', task_path)
                     pretrain_embedding = torch.load(task_path)
                     self.task_list.append(pretrain_embedding['task_shared'])
         self.shared_attn = config.shared_attn
@@ -1969,7 +1977,8 @@ class T5ForConditionalGeneration(T5PreTrainedModel):
         output_hidden_states=None,
         return_dict=None,
         task=None,
-        task_ids=None
+        task_ids=None,
+        moe_output=None
     ):
         r"""
         labels (:obj:`torch.LongTensor` of shape :obj:`(batch_size,)`, `optional`):
@@ -2027,7 +2036,8 @@ class T5ForConditionalGeneration(T5PreTrainedModel):
                 return_dict=return_dict,
                 task_embedding=None,
                 task=task,
-                task_ids=task_ids
+                task_ids=task_ids,
+                moe_output=moe_output
             )
         elif return_dict and not isinstance(encoder_outputs, BaseModelOutput):
             encoder_outputs = BaseModelOutput(
@@ -2084,7 +2094,8 @@ class T5ForConditionalGeneration(T5PreTrainedModel):
             output_hidden_states=output_hidden_states,
             return_dict=return_dict,
             task_embedding=None,
-            task=task
+            task=task,
+            moe_output=moe_output
         )
 
         sequence_output = decoder_outputs[0]
@@ -2163,7 +2174,7 @@ class T5ForConditionalGeneration(T5PreTrainedModel):
             "encoder_outputs": encoder_outputs,
             "attention_mask": attention_mask,
             "use_cache": use_cache,
-            "task": kwargs["task"]
+            "task": kwargs["task"],
             # "lang": kwargs["lang"]
         }
 

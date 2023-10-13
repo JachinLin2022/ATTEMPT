@@ -37,7 +37,7 @@ small_task=(superglue-cb superglue-wsc-fixed)
 lrs=(3e-4 6e-4 1e-3)
 
 
-target_task=(superglue-multirc)
+target_task=(superglue-multirc superglue-cb superglue-wsc-fixed superglue-wic superglue-boolq mrpc cola stsb rte)
 
 # lora moe，不同lr
 for learning_rate in ${lrs[@]}
@@ -52,16 +52,15 @@ do
         max_source_length=256
         if [[ "${big_task[@]}" =~ "${task}" ]]; then
             num_train_epochs=10
-            per_device_train_batch_size=64
-            max_source_length=384
+            max_source_length=348
         fi
 
         if [[ "${small_task[@]}" =~ "${task}" ]]; then
             per_device_train_batch_size=32
         fi
-        load_lora_path="/mlx_devbox/users/linzhisheng.2021/ATTEMPT/attempt/result/stage1/mnli_fp32/lora.pt,/mlx_devbox/users/linzhisheng.2021/ATTEMPT/attempt/result/stage1/qnli_fp32/lora.pt,/mlx_devbox/users/linzhisheng.2021/ATTEMPT/attempt/result/stage1/qqp_fp32/lora.pt"
-        load_task_path="/mlx_devbox/users/linzhisheng.2021/ATTEMPT/attempt/result/stage1/mnli_fp32/task_embedding.pt,/mlx_devbox/users/linzhisheng.2021/ATTEMPT/attempt/result/stage1/qnli_fp32/task_embedding.pt,/mlx_devbox/users/linzhisheng.2021/ATTEMPT/attempt/result/stage1/qqp_fp32/task_embedding.pt"
-        output_dir="/mlx_devbox/users/linzhisheng.2021/ATTEMPT/attempt/result/stage2_softmax/"$learning_rate"_"$task"_"$per_device_train_batch_size
+        load_lora_path="/mlx_devbox/users/linzhisheng.2021/ATTEMPT/attempt/result/stage1/mnli_fp32/task_embedding.pt,/mlx_devbox/users/linzhisheng.2021/ATTEMPT/attempt/result/stage1/qnli_fp32/task_embedding.pt,/mlx_devbox/users/linzhisheng.2021/ATTEMPT/attempt/result/stage1/qqp_fp32/task_embedding.pt,/mlx_devbox/users/linzhisheng.2021/ATTEMPT/attempt/result/stage1/sst2_fp32/task_embedding.pt"
+        load_task_path="/mlx_devbox/users/linzhisheng.2021/ATTEMPT/attempt/result/stage1/mnli_fp32/task_embedding.pt,/mlx_devbox/users/linzhisheng.2021/ATTEMPT/attempt/result/stage1/qnli_fp32/task_embedding.pt,/mlx_devbox/users/linzhisheng.2021/ATTEMPT/attempt/result/stage1/qqp_fp32/task_embedding.pt,/mlx_devbox/users/linzhisheng.2021/ATTEMPT/attempt/result/stage1/sst2_fp32/task_embedding.pt"
+        output_dir="/mlx_devbox/users/linzhisheng.2021/ATTEMPT/attempt/result/stage2_softmax_4lora/"$learning_rate"_"$task"_"$per_device_train_batch_size
 
         echo $task $num_train_epochs
             python run_seq2seq.py \
@@ -113,3 +112,5 @@ do
             --load_lora_path=$load_lora_path
     done
 done
+
+bash run_stage1_lora_task.sh

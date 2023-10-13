@@ -42,7 +42,7 @@ class BaseTrainer(Trainer):
         Trainer class then use this average metric to save the best model."""
         super().__init__(*args, **kwargs)
         self.evaluation_metrics = evaluation_metrics
-        print(multi_task_compute_metrics)
+        # print(multi_task_compute_metrics)
         self.multi_task_compute_metrics = multi_task_compute_metrics
         self.data_info = data_info
 
@@ -193,6 +193,7 @@ class BaseTrainer(Trainer):
 
         observed_num_examples = 0
         # Main evaluation loop
+        moe_output_list = []
         for step, inputs in enumerate(dataloader):
             # Update the observed num examples
             observed_batch_size = find_batch_size(inputs)
@@ -200,7 +201,7 @@ class BaseTrainer(Trainer):
                 observed_num_examples += observed_batch_size
 
             # Prediction step
-            loss, logits, labels = self.prediction_step(
+            loss, logits, labels, moe_output = self.prediction_step(
                 model, inputs, prediction_loss_only, ignore_keys=ignore_keys)
 
             # Update containers on host
@@ -240,6 +241,11 @@ class BaseTrainer(Trainer):
 
                 # Set back to None to begin a new accumulation
                 losses_host, preds_host, labels_host = None, None, None
+            if moe_output is not None:
+                moe_output_list.append(moe_output)
+
+        moe_output_metrics = np.array(moe_output_list).mean(0) if len(moe_output_list) > 0 else []
+
 
         if self.args.past_index and hasattr(self, "_past"):
             # Clean the state at the end of the evaluation loop
@@ -281,14 +287,14 @@ class BaseTrainer(Trainer):
                                                           data_info=self.get_data_info(metric_key_prefix)))
         else:
             metrics = {}
-
+        for idx,weight in enumerate(moe_output_metrics):
+            metrics[f'moe_weight_{idx}'] = weight
         # To be JSON-serializable, we need to remove numpy types or zero-d tensors
         metrics = denumpify_detensorize(metrics)
 
         if all_losses is not None:
             metrics[f"{metric_key_prefix}_loss"] = all_losses.mean().item()
 
-        metrics["moe_weight"] = [0.5,0.5,0]
         # Prefix all keys with metric_key_prefix + '_'
         for key in list(metrics.keys()):
             if not key.startswith(f"{metric_key_prefix}_"):

@@ -2,7 +2,7 @@ from packaging import version
 import torch
 from torch import nn
 from typing import Any, Dict, List, Optional, Tuple, Union
-
+import numpy as np
 from torch.utils.data.dataset import Dataset
 from transformers import Seq2SeqTrainer
 from .trainer import BaseTrainer
@@ -43,7 +43,7 @@ class Seq2SeqTrainer(Seq2SeqTrainer, BaseTrainer):
         inputs: Dict[str, Union[torch.Tensor, Any]],
         prediction_loss_only: bool,
         ignore_keys: Optional[List[str]] = None,
-    ) -> Tuple[Optional[float], Optional[torch.Tensor], Optional[torch.Tensor]]:
+    ) -> Tuple[Optional[float], Optional[torch.Tensor], Optional[torch.Tensor],Optional[List]]:
         """
         Perform an evaluation step on :obj:`model` using obj:`inputs`.
 
@@ -76,24 +76,26 @@ class Seq2SeqTrainer(Seq2SeqTrainer, BaseTrainer):
             "num_beams": self._num_beams if self._num_beams is not None else self.model.config.num_beams,
             "task": inputs["task"] if "task" in inputs else "all"
         }
-
         generated_tokens = self.model.generate(
             inputs["input_ids"],
             attention_mask=inputs["attention_mask"],
             **gen_kwargs,
         )
-
         # in case the batch is shorter than max length, the output should be padded
         if generated_tokens.shape[-1] < gen_kwargs["max_length"]:
             generated_tokens = self._pad_tensors_to_max_len(
                 generated_tokens, gen_kwargs["max_length"])
 
         with torch.no_grad():
+            moe_output = [0]
             if self.use_amp:
                 with autocast():
-                    outputs = model(**inputs)
+                    outputs = model(**inputs,moe_output=moe_output)
             else:
-                outputs = model(**inputs)
+                outputs = model(**inputs,moe_output=moe_output)
+            moe_output = np.array(moe_output[1:])
+            
+            moe_output = moe_output.mean(1).mean(0).squeeze() if len(moe_output) > 0 else None
             if has_labels:
                 if self.label_smoother is not None:
                     loss = self.label_smoother(
@@ -112,4 +114,4 @@ class Seq2SeqTrainer(Seq2SeqTrainer, BaseTrainer):
             labels = self._pad_tensors_to_max_len(
                 labels, gen_kwargs["max_length"])
 
-        return (loss, generated_tokens, labels)
+        return (loss, generated_tokens, labels, moe_output)

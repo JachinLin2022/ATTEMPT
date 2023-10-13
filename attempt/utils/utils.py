@@ -238,11 +238,14 @@ def init_task_param(config, tokenizer):
         "qqp": "Given two questions, the task is to determine whether the two questions have the same intent or meaning.",
         "mrpc": "Given a pair of sentences, the task is to determine whether the two sentences are semantically equivalent or not.",
         "stsb": "Given a pair of sentences, the task is to measure the degree of semantic similarity or relatedness between pairs of sentences.",
+        "sst2": "Given a sentence, the task is to predict whether a given sentence expresses a positive or negative sentiment.",
         "superglue-cb": "Given a premise and a hypothesis, the task is to determine the type and strength of the commitment being expressed.",
         "superglue-wic": "Given a target word and a pair of sentences, the task is to determine if the target word has the same meaning in two different contexts.",
         "superglue-wsc-fixed": "Given a set of sentences that contain an ambiguous pronoun, the task is to determine the referent of the ambiguous pronoun based on the context provided.",
         "superglue-boolq": "Given a question and a paragraph, the task is to determine if the question can be answered with a simple 'true' or 'false' based on the given passage of text.",
-        "superglue-multirc": "Given a passage of text and a set of multiple-choice questions, the task is to select the correct answer choice for each question based on the information provided in the passage."
+        "superglue-multirc": "Given a passage of text and a set of multiple-choice questions, the task is to select the correct answer choice for each question based on the information provided in the passage.",
+        "superglue-record": "Given a passage and a cloze-style question about the article in which one entity is masked out, the task is to predict the masked out entity from a list of possible entities in the provided passage.",
+        'squad': "Given an article and a corresponding question about the article, the task is to answer the question accurately based on the provided context in the articles."
     }
     task_token_id = tokenizer(task_desc_map[task])['input_ids']
     config.task_embedding_len = len(task_token_id)

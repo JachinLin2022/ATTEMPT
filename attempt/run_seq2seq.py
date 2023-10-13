@@ -16,8 +16,6 @@
 Fine-tuning the library models for sequence to sequence.
 """
 # You can also adapt this script on your own sequence to sequence task. Pointers for this are left as comments.
-import os
-os.environ['CUDA_VISIBLE_DEVICES'] = '0,1'
 from adapters.lora import adapter_state_dict, lora_state_dict, task_embedding_state_dict
 from utils import modify_model_after_init, save_training_config, save_prompts, init_task_param
 import shutil
@@ -312,6 +310,10 @@ def main():
             tokenizer=tokenizer, default_max_length=data_args.max_target_length, )
             for dataset_name, dataset_config_name in zip(data_args.dataset_name, data_args.dataset_config_name)]
 
+        print('max_target_lengths=', max_target_lengths)
+
+        for index in random.sample(range(len(train_datasets[0])), 2):
+            logger.info(f"Sample {index} of the training set: {train_datasets[0][index]}.")
 
         for i, train_dataset in enumerate(train_datasets):
             if model_args.shared_attn is True:
@@ -335,10 +337,8 @@ def main():
                     load_from_cache_file=not data_args.overwrite_cache,
                 )
         train_dataset = concatenate_datasets(train_datasets)
-
-        for index in random.sample(range(len(train_dataset)), 7):
-            logger.info(f"Sample {index} of the training set: {train_dataset[index]}.")
-
+        print(train_dataset)
+        
     if training_args.do_eval:
         if data_args.validation_files is not None:
             eval_datasets = {eval_dataset: AutoTask.get(eval_dataset, eval_dataset_config,
@@ -382,6 +382,7 @@ def main():
                     remove_columns=column_names,
                     load_from_cache_file=not data_args.overwrite_cache,
                 )
+            print(eval_datasets[name])
 
     if training_args.do_test:
         if data_args.test_files is not None:
@@ -425,6 +426,7 @@ def main():
                     remove_columns=column_names,
                     load_from_cache_file=not data_args.overwrite_cache,
                 )
+            print(test_datasets[name])
 
     # Data collator
     label_pad_token_id = - \
@@ -444,7 +446,7 @@ def main():
     print(data_args.eval_dataset_name)
     compute_metrics_fn = build_compute_metrics_fn(
         data_args.eval_dataset_name, tokenizer, data_args.ignore_pad_token_for_loss) if training_args.predict_with_generate else None
-    print(compute_metrics_fn)
+    # print(compute_metrics_fn)
 
     data_info = {"eval": eval_datasets[data_args.eval_dataset_name[0]]['extra_fields'],
                  "test": test_datasets[data_args.test_dataset_name[0]]['extra_fields'] if training_args.do_test else None,

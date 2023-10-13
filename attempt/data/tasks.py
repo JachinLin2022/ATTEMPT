@@ -190,12 +190,15 @@ class AbstractTask(abc.ABC):
 class Squad(AbstractTask):
     name = "squad"
     metric = [metrics.squad]
-
+    split_to_data_split = {"train": "train",
+                           "validation": "validation",
+                           "test": "validation"}
     def load_dataset(self, split):
         return datasets.load_dataset(self.name, split=split)
 
     def preprocessor(self, example, add_prefix):
-        answer = pad_punctuation(example['answers']).split("\t")
+        # answer = pad_punctuation(example['answers']).split("\t")
+        answer = pad_punctuation(example['answers']['text'][0])
         question = pad_punctuation(example['question'])
         context = pad_punctuation(example['context'])
         source = ["question:", question,

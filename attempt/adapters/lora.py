@@ -152,7 +152,10 @@ class Linear(nn.Linear, LoRALayer):
                 # self.num_experts = lora_num
                 # self.noisy_gating = True
                 self.w_gate = nn.Parameter(torch.zeros(in_features, lora_num), requires_grad=True)
-                nn.init.kaiming_uniform_(self.w_gate, a=math.sqrt(5))
+                nn.init.zeros_(self.w_gate)
+                print('using zeros_ gate')
+                # nn.init.kaiming_uniform_(self.w_gate, a=math.sqrt(5))
+
                 # self.softplus = nn.Softplus()
                 self.softmax = nn.Softmax(dim=-1)
                 # self.register_buffer("mean", torch.tensor([0.0]))
@@ -197,7 +200,7 @@ class Linear(nn.Linear, LoRALayer):
 
    
 
-    def forward(self, x: torch.Tensor):
+    def forward(self, x: torch.Tensor, moe_output):
         def T(w):
             return w.transpose(0, 1) if self.fan_in_fan_out else w
         if self.r > 0 and not self.merged:
@@ -233,7 +236,10 @@ class Linear(nn.Linear, LoRALayer):
 
                 # gete_out[:,:,0] = gete_out[:,:,0] + 999999999
                 # gete_out[:,:,1:] = 0
+                
                 gating_weights = self.softmax(gete_out)
+                if moe_output:
+                    moe_output.append(gating_weights.cpu().numpy())
                 # print(gating_weights[0])
                 # print(gating_weights.shape)   
 

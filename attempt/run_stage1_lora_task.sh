@@ -10,14 +10,14 @@ save_strategy="no"
 model_name_or_path="t5-base"
 tokenizer_name="t5-base"
 save_total_limit=1
-per_device_train_batch_size=128
+per_device_train_batch_size=64
 per_device_eval_batch_size=256
 load_best_model_at_end=true
 metric_for_best_model="average_metrics"
 greater_is_better=true
 evaluation_strategy="epoch"
 non_linearity="gelu_new"
-max_source_length=256
+max_source_length=512
 learning_rate=5e-4
 split_validation_test=true
 dataset_config_name=("en")
@@ -30,7 +30,7 @@ report_to="none"
 add_lora=true
 train_lora=true
 add_task_embedding=true
-target_task=(qqp)
+target_task=(superglue-record)
 for task in ${target_task[@]}
 do
     bash clean.sh

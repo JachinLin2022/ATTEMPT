@@ -230,7 +230,7 @@ def mean_group_metric(metric_fn, group_key="group", value_key="value"):
 def build_compute_metrics_fn(task_names, tokenizer, ignore_pad_token_for_loss):
     """Builds a dictionary from each task to the task metric."""
 
-    print(task_names)
+    # print(task_names)
 
     def compute_metrics(eval_preds, eval_metrics, post_processor=None):
         preds, labels, data_info = eval_preds
