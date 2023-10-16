@@ -17,7 +17,7 @@ Fine-tuning the library models for sequence to sequence.
 """
 # You can also adapt this script on your own sequence to sequence task. Pointers for this are left as comments.
 import os
-os.environ["CUDA_VISIBLE_DEVICES"] = "0,1,2,3"
+os.environ["CUDA_VISIBLE_DEVICES"] = "0,1,2,6"
 # os.environ["CUDA_VISIBLE_DEVICES"] = "4,5"
 from adapters.lora import adapter_state_dict, lora_state_dict, task_embedding_state_dict
 from utils import modify_model_after_init, save_training_config, save_prompts, init_task_param

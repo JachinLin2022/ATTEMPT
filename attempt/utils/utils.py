@@ -249,7 +249,11 @@ def init_task_param(config, tokenizer):
         'nq': "Given an article and a corresponding question about the article, the task is to answer the question accurately based on the provided context in the articles.",
         'newsqa': "Given an article and a corresponding question about the article, the task is to answer the question accurately based on the provided context in the articles.",
         'hotpotqa': "Given an article and a corresponding question about the article, the task is to answer the question accurately based on the provided context in the articles.",
-        'searchqa': "Given an article and a corresponding question about the article, the task is to answer the question accurately based on the provided context in the articles."
+        'searchqa': "Given an article and a corresponding question about the article, the task is to answer the question accurately based on the provided context in the articles.",
+        'scitail': "Given a premise and a hypothesis, the task is to classify the relationship between the premise and the hypothesis as entail or neutral.",
+        'yelp_polarity': "Given a Yelp sentence, the task is to predict the sentiment polarity (positive or negative) of customer reviews from the Yelp dataset.",
+        'winogrande': "Given a sentence and two options, the task is to choose the right option for a given sentence which requires commonsense reasoning.",
+        'paws': "Given a pair of sentence, where one sentence is a paraphrase of the other. The task is to determine if the given sentence pair is a paraphrase or not."
     }
     task_token_id = tokenizer(task_desc_map[task])['input_ids']
     config.task_embedding_len = len(task_token_id)

@@ -371,7 +371,7 @@ class SciTail(AbstractTask):
         label2id = {"entailment": "0", "neutral": "1"}
         src_texts = ["premise:", example['sentence1'],
                      "hypothesis:", example["sentence2"]]
-        tgt_texts = [label2id[example["gold_label"]]]
+        tgt_texts = [example["gold_label"]]
         return self.seq2seq_format(src_texts, tgt_texts, add_prefix)
 
 

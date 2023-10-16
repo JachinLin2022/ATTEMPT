@@ -265,8 +265,7 @@ class Linear(nn.Linear, LoRALayer):
                 if len(final_output.shape) == 2:
                     final_output = final_output.unsqueeze(1)
                 result += final_output
-
-            return result
+            return result, gating_weights
         else:
             return F.linear(x, T(self.weight), bias=self.bias)
 
