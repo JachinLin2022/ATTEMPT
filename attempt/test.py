@@ -1,3 +1,3 @@
-from datasets import load_dataset
-data = load_dataset('super_glue', 'multirc')
-print(data)
+import datasets
+mrqa = datasets.load_dataset('tau/mrqa','newsqa',split='train')
+print(mrqa[0]['answer'])

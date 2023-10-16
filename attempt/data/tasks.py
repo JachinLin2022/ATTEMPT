@@ -206,6 +206,81 @@ class Squad(AbstractTask):
         target = [answer] if type(answer) == str else answer
         return self.seq2seq_format(source, target, add_prefix)
 
+class Newsqa(AbstractTask):
+    name = "newsqa"
+    metric = [metrics.squad]
+    split_to_data_split = {"train": "train",
+                           "validation": "validation",
+                           "test": "validation"}
+    def load_dataset(self, split):
+        return datasets.load_dataset("tau/mrqa", "newsqa", split=split)
+
+    def preprocessor(self, example, add_prefix):
+        # answer = pad_punctuation(example['answers']).split("\t")
+        answer = pad_punctuation(example['answer'])
+        question = pad_punctuation(example['question'])
+        context = pad_punctuation(example['context'])
+        source = ["question:", question,
+                  "context:", context]
+        target = [answer] if type(answer) == str else answer
+        return self.seq2seq_format(source, target, add_prefix)
+
+class Searchqa(AbstractTask):
+    name = "searchqa"
+    metric = [metrics.squad]
+    split_to_data_split = {"train": "train",
+                           "validation": "validation",
+                           "test": "validation"}
+    def load_dataset(self, split):
+        return datasets.load_dataset("tau/mrqa", "searchqa", split=split)
+
+    def preprocessor(self, example, add_prefix):
+        # answer = pad_punctuation(example['answers']).split("\t")
+        answer = pad_punctuation(example['answer'])
+        question = pad_punctuation(example['question'])
+        context = pad_punctuation(example['context'])
+        source = ["question:", question,
+                  "context:", context]
+        target = [answer] if type(answer) == str else answer
+        return self.seq2seq_format(source, target, add_prefix)
+
+class NQ(AbstractTask):
+    name = "nq"
+    metric = [metrics.squad]
+    split_to_data_split = {"train": "train",
+                           "validation": "validation",
+                           "test": "validation"}
+    def load_dataset(self, split):
+        return datasets.load_dataset("tau/mrqa", "natural_questions", split=split)
+
+    def preprocessor(self, example, add_prefix):
+        # answer = pad_punctuation(example['answers']).split("\t")
+        answer = pad_punctuation(example['answer'])
+        question = pad_punctuation(example['question'])
+        context = pad_punctuation(example['context'])
+        source = ["question:", question,
+                  "context:", context]
+        target = [answer] if type(answer) == str else answer
+        return self.seq2seq_format(source, target, add_prefix)
+
+class Hotpotqa(AbstractTask):
+    name = "hotpotqa"
+    metric = [metrics.squad]
+    split_to_data_split = {"train": "train",
+                           "validation": "validation",
+                           "test": "validation"}
+    def load_dataset(self, split):
+        return datasets.load_dataset("tau/mrqa", "hotpotqa", split=split)
+
+    def preprocessor(self, example, add_prefix):
+        # answer = pad_punctuation(example['answers']).split("\t")
+        answer = pad_punctuation(example['answer'])
+        question = pad_punctuation(example['question'])
+        context = pad_punctuation(example['context'])
+        source = ["question:", question,
+                  "context:", context]
+        target = [answer] if type(answer) == str else answer
+        return self.seq2seq_format(source, target, add_prefix)
 
 class DROP(AbstractTask):
     name = "drop"
@@ -857,11 +932,11 @@ TASK_MAPPING = OrderedDict(
         ('snli', SNLI),
         ('piqa', PIQA),
         ('drop', DROP),
-        ('newsqa', Squad),
-        ('searchqa', Squad),
+        ('newsqa', Newsqa),
+        ('searchqa', Searchqa),
         ('triviaqa', Squad),
-        ('nq', Squad),
-        ('hotpotqa', Squad),
+        ('nq', NQ),
+        ('hotpotqa', Hotpotqa),
         ("social_i_qa", SocialIQA),
         ("commonsense_qa", CommonsenseQA),
         ("winogrande", WinoGrande),

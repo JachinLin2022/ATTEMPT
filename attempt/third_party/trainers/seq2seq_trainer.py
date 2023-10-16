@@ -9,7 +9,7 @@ from .trainer import BaseTrainer
 from adapters.lora import lora_state_dict
 if version.parse(torch.__version__) >= version.parse("1.6"):
     from torch.cuda.amp import autocast
-
+import torch.distributed as dist
 
 class Seq2SeqTrainer(Seq2SeqTrainer, BaseTrainer):
     def __init__(self, train_dataset_sizes=None, shared=False, multiple_metrics=None, adapter_config=None, *args, **kwargs):

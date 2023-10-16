@@ -82,8 +82,8 @@ def freeze_model_params(model, adapter_args, adapter_config):
             for n, p in model.named_parameters():
                 if 'task_shared' in n:
                     p.requires_grad = True
-                # if 'task_list' in n:
-                #     p.requires_grad = True
+                if 'temperature' in n:
+                    p.requires_grad = True
     # Unfreezes LoRA
     if adapter_args.train_lora:
         freeze_params(model)
@@ -245,7 +245,11 @@ def init_task_param(config, tokenizer):
         "superglue-boolq": "Given a question and a paragraph, the task is to determine if the question can be answered with a simple 'true' or 'false' based on the given passage of text.",
         "superglue-multirc": "Given a passage of text and a set of multiple-choice questions, the task is to select the correct answer choice for each question based on the information provided in the passage.",
         "superglue-record": "Given a passage and a cloze-style question about the article in which one entity is masked out, the task is to predict the masked out entity from a list of possible entities in the provided passage.",
-        'squad': "Given an article and a corresponding question about the article, the task is to answer the question accurately based on the provided context in the articles."
+        'squad': "Given an article and a corresponding question about the article, the task is to answer the question accurately based on the provided context in the articles.",
+        'nq': "Given an article and a corresponding question about the article, the task is to answer the question accurately based on the provided context in the articles.",
+        'newsqa': "Given an article and a corresponding question about the article, the task is to answer the question accurately based on the provided context in the articles.",
+        'hotpotqa': "Given an article and a corresponding question about the article, the task is to answer the question accurately based on the provided context in the articles.",
+        'searchqa': "Given an article and a corresponding question about the article, the task is to answer the question accurately based on the provided context in the articles."
     }
     task_token_id = tokenizer(task_desc_map[task])['input_ids']
     config.task_embedding_len = len(task_token_id)

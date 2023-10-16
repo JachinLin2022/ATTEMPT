@@ -22,4 +22,4 @@ delete_checkpoint_dirs() {
   done
 }
 
-delete_checkpoint_dirs "$path"
+delete_checkpoint_dirs $1

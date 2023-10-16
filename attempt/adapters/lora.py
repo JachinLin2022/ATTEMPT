@@ -127,7 +127,8 @@ class Linear(nn.Linear, LoRALayer):
         merge_weights: bool = True,
         lora_num:int = 1,
         task_prefix_len:int = 1,
-        **kwargs
+        is_decoder:int = 0,
+        **kwargs,
     ):
         nn.Linear.__init__(self, in_features, out_features, **kwargs)
         LoRALayer.__init__(self, r=r, lora_alpha=lora_alpha, lora_dropout=lora_dropout,
@@ -151,7 +152,9 @@ class Linear(nn.Linear, LoRALayer):
                 # self.k = lora_num
                 # self.num_experts = lora_num
                 # self.noisy_gating = True
-                self.w_gate = nn.Parameter(torch.zeros(in_features, lora_num), requires_grad=True)
+                self.w_gate = nn.Parameter(torch.zeros(out_features if is_decoder else in_features, lora_num), requires_grad=True)
+                # self.temperature = (out_features * torch.exp(torch.clamp(nn.Parameter(torch.Tensor([1]), requires_grad=True), min=0.005, max=5))).cuda()
+                self.temperature = 1
                 nn.init.zeros_(self.w_gate)
                 print('using zeros_ gate')
                 # nn.init.kaiming_uniform_(self.w_gate, a=math.sqrt(5))
@@ -200,7 +203,7 @@ class Linear(nn.Linear, LoRALayer):
 
    
 
-    def forward(self, x: torch.Tensor, moe_output):
+    def forward(self, x: torch.Tensor, moe_output=None, encoder_hidden_states=None):
         def T(w):
             return w.transpose(0, 1) if self.fan_in_fan_out else w
         if self.r > 0 and not self.merged:
@@ -214,10 +217,16 @@ class Linear(nn.Linear, LoRALayer):
                 # using token 0 as task vector
                 # print(self.task_prefix_len)
 
-                if x.shape[1] > self.task_prefix_len:
-                    gate_x = x[:,:self.task_prefix_len,:].mean(1).unsqueeze(1)
+                # if x.shape[1] > self.task_prefix_len:
+                #     gate_x = x[:,:self.task_prefix_len,:].mean(1).unsqueeze(1)
+                # else:
+                #     gate_x = x[:,0,:].unsqueeze(1)
+                if encoder_hidden_states is not None:
+                    gate_x = encoder_hidden_states[:,:self.task_prefix_len,:].mean(1).unsqueeze(1)
                 else:
-                    gate_x = x[:,0,:].unsqueeze(1)
+                    gate_x = x[:,:self.task_prefix_len,:].mean(1).unsqueeze(1)
+
+
                 gete_out = gate_x @ self.w_gate
 
                 # gete_out = (x @ self.w_gate).sum(dim=1).unsqueeze(1)
@@ -230,16 +239,21 @@ class Linear(nn.Linear, LoRALayer):
                 #     result += (self.lora_dropout(x) @ self.lora_A[i].transpose(0, 1) @ self.lora_B[i].transpose(0, 1)) * self.scaling * gate[i].item()
                 
 
-                # max_index = torch.argmax(gete_out,dim=2)
-                # gating_weights = torch.zeros_like(gete_out)
-                # gating_weights.scatter_(2, max_index.unsqueeze(2), 1)
+                if 1 or self.training:
+                    gating_weights = self.softmax(gete_out/self.temperature)
+                else:
+                    print('argmax')
+                    max_index = torch.argmax(gete_out,dim=2)
+                    gating_weights = torch.zeros_like(gete_out)
+                    gating_weights.scatter_(2, max_index.unsqueeze(2), 1)
 
                 # gete_out[:,:,0] = gete_out[:,:,0] + 999999999
                 # gete_out[:,:,1:] = 0
                 
-                gating_weights = self.softmax(gete_out)
+                
                 if moe_output:
-                    moe_output.append(gating_weights.cpu().numpy())
+                    pass
+                    # moe_output.append(gating_weights.cpu().numpy())
                 # print(gating_weights[0])
                 # print(gating_weights.shape)   
 

@@ -38,7 +38,7 @@ from transformers.file_utils import (
 from transformers.modeling_outputs import (
     BaseModelOutput,
     BaseModelOutputWithPastAndCrossAttentions,
-    Seq2SeqLMOutput,
+    # Seq2SeqLMOutput,
     Seq2SeqModelOutput,
     ModelOutput
 )
@@ -48,8 +48,7 @@ from transformers.utils.model_parallel_utils import assert_device_map, get_devic
 from .configuration_t5 import T5Config
 
 from adapters import AdapterController,Linear
-from typing import Dict, Any
-
+from typing import Dict, Any, List, Tuple, Optional
 
 logger = logging.get_logger(__name__)
 
@@ -234,6 +233,20 @@ DEPARALLELIZE_DOCSTRING = r"""
         model.deparallelize() # Put the model back on cpu and cleans memory by calling torch.cuda.empty_cache()
 """
 
+from dataclasses import dataclass
+@dataclass
+class Seq2SeqLMOutput(ModelOutput):
+    loss: Optional[torch.FloatTensor] = None
+    logits: torch.FloatTensor = None
+    past_key_values: Optional[Tuple[Tuple[torch.FloatTensor]]] = None
+    decoder_hidden_states: Optional[Tuple[torch.FloatTensor]] = None
+    decoder_attentions: Optional[Tuple[torch.FloatTensor]] = None
+    cross_attentions: Optional[Tuple[torch.FloatTensor]] = None
+    encoder_last_hidden_state: Optional[torch.FloatTensor] = None
+    encoder_hidden_states: Optional[Tuple[torch.FloatTensor]] = None
+    encoder_attentions: Optional[Tuple[torch.FloatTensor]] = None
+    hook_out: Optional[dict] = None
+
 
 class T5LayerNorm(nn.Module):
     def __init__(self, hidden_size, eps=1e-6, adapter_config=None):
@@ -274,7 +287,7 @@ class T5DenseReluDense(nn.Module):
             self.wi = nn.Linear(config.d_model, config.d_ff,
                             bias=False if not self.bitfit else True)
             # self.wi = Linear(config.d_model, config.d_ff, 64, 64, 0, bias=False if not self.bitfit else True, merge_weights=False, lora_num=config.lora_num)
-            self.wo = Linear(config.d_ff, config.d_model, 64, 64, 0, bias=False if not self.bitfit else True, merge_weights=False, lora_num=config.lora_num, task_prefix_len=config.task_embedding_len)
+            self.wo = Linear(config.d_ff, config.d_model, 64, 64, 0, bias=False if not self.bitfit else True, merge_weights=False, lora_num=config.lora_num, task_prefix_len=config.task_embedding_len, is_decoder=config.is_decoder)
         else:
             if self.train_task_adapters:
                 adapter_config.reduction_factor = adapter_config.task_reduction_factor
@@ -288,7 +301,7 @@ class T5DenseReluDense(nn.Module):
                                 bias=False if not self.bitfit else True)
         self.dropout = nn.Dropout(config.dropout_rate)
 
-    def forward(self, hidden_states, task=None, moe_output=None):
+    def forward(self, hidden_states, task=None, moe_output=None, encoder_hidden_states=None):
         if self.train_task_adapters:
             residual = hidden_states
         hidden_states = self.wi(hidden_states)
@@ -301,7 +314,10 @@ class T5DenseReluDense(nn.Module):
             hidden_states = self.wo(hidden_states)
             return hidden_states + adapter_hidden_states
         if self.add_lora:
-            hidden_states = self.wo(hidden_states, moe_output)
+            hidden_states = self.wo(hidden_states, moe_output, encoder_hidden_states)
+            if isinstance(hidden_states, tuple):
+                hidden_states = hidden_states[0]
+
         else:
             hidden_states = self.wo(hidden_states)
         return hidden_states
@@ -355,9 +371,9 @@ class T5LayerFF(nn.Module):
             config.d_model, eps=config.layer_norm_epsilon, adapter_config=adapter_config)
         self.dropout = nn.Dropout(config.dropout_rate)
 
-    def forward(self, hidden_states, task_block_adapters=None, task=None, moe_output=None):
+    def forward(self, hidden_states, task_block_adapters=None, task=None, moe_output=None, encoder_hidden_states=None):
         forwarded_states = self.layer_norm(hidden_states)
-        forwarded_states = self.DenseReluDense(forwarded_states, task, moe_output)
+        forwarded_states = self.DenseReluDense(forwarded_states, task, moe_output, encoder_hidden_states)
         if self.train_task_adapters:
             # task = 'rte'
             task = self.config.target_task[0]
@@ -804,7 +820,7 @@ class T5Block(nn.Module):
         # Apply Feed Forward layer
         hidden_states = self.layer[-1](hidden_states,
                                        task_block_adapters=task_block_adapters,
-                                       task=task, moe_output=moe_output)
+                                       task=task, moe_output=moe_output, encoder_hidden_states=encoder_hidden_states)
 
         # clamp inf values to enable fp16 training
         if hidden_states.dtype == torch.float16 and torch.isinf(hidden_states).any():
@@ -1831,9 +1847,26 @@ class T5ForConditionalGeneration(T5PreTrainedModel):
         # Model parallel
         self.model_parallel = False
         self.device_map = None
+        # self.hook_out = []
+        # self.enable_hook = 0
+        # for i,(n,m) in enumerate(self.named_modules()):
+        #     if 'DenseReluDense.wo' in n and 'lora' not in n and 'softmax' not in n:
+        #         m.register_forward_hook(self.hook)
+        #         print(i,n)
 
-    ###############################################
 
+    def hook(self, module, input, output):
+        if not module.training:
+            # print(len(output[1]))
+            self.hook_out.append(output[1])
+        # else:
+        #     print(len(output[1]))
+        # if len(self.hook_out.keys()) > 0:
+        #     print(self.hook_out.keys())
+        #     self.hook_out[input[0].device].append(output[1])
+    # ###############################################
+
+    
     def init_prefix_weights(self):
         if self.init_prefix_from_vocab:
             indices = np.random.permutation(range(5000))[:self.prefix_dim]
@@ -2006,7 +2039,7 @@ class T5ForConditionalGeneration(T5PreTrainedModel):
         """
         use_cache = use_cache if use_cache is not None else self.config.use_cache
         return_dict = return_dict if return_dict is not None else self.config.use_return_dict
-
+        self.hook_out = []
         # FutureWarning: head_mask was separated into two input args - head_mask, decoder_head_mask
         if head_mask is not None and decoder_head_mask is None:
             if self.config.num_layers == self.config.num_decoder_layers:
@@ -2122,7 +2155,6 @@ class T5ForConditionalGeneration(T5PreTrainedModel):
         if not return_dict:
             output = (lm_logits,) + decoder_outputs[1:] + encoder_outputs
             return ((loss,) + output) if loss is not None else output
-
         return Seq2SeqLMOutput(
             loss=loss,
             logits=lm_logits,
@@ -2133,6 +2165,7 @@ class T5ForConditionalGeneration(T5PreTrainedModel):
             encoder_last_hidden_state=encoder_outputs.last_hidden_state,
             encoder_hidden_states=encoder_outputs.hidden_states,
             encoder_attentions=encoder_outputs.attentions,
+            hook_out=self.hook_out
         )
 
     def _prepare_encoder_decoder_kwargs_for_generation(
