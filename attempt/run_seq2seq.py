@@ -149,6 +149,10 @@ def main():
                 source_list.append('qnli')
             if 'mnli' in adapter:
                 source_list.append('mnli')
+            if 'qqp' in adapter:
+                source_list.append('qqp')
+            if 'sst2' in adapter:
+                source_list.append('sst2')
         config.source_task = source_list
 
     config.temperature = model_args.temperature
@@ -287,6 +291,8 @@ def main():
     column_names = ['source', 'target', 'extra_fields']
     performance_metrics = {}
     if training_args.do_train:
+        if 'yelp_polarity' == data_args.dataset_name[0]:
+            data_args.max_train_samples = 100000
         # Load datasets from files if your target datasets are not in huggingface datasets.
         if data_args.train_files is not None:
             train_datasets = [AutoTask.get(dataset_name,

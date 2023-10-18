@@ -10,14 +10,14 @@ save_strategy="no"
 model_name_or_path="t5-base"
 tokenizer_name="t5-base"
 save_total_limit=1
-per_device_train_batch_size=64
+per_device_train_batch_size=128
 per_device_eval_batch_size=256
 load_best_model_at_end=true
 metric_for_best_model="average_metrics"
 greater_is_better=true
 evaluation_strategy="epoch"
 non_linearity="gelu_new"
-max_source_length=512
+max_source_length=256
 learning_rate=5e-4
 split_validation_test=true
 dataset_config_name=("en")
@@ -30,13 +30,15 @@ report_to="none"
 add_lora=true
 train_lora=true
 add_task_embedding=true
-target_task=(superglue-record)
+
+
+target_task=(mnli qqp)
+task_reduction_factor=48
 for task in ${target_task[@]}
 do
-
     t=($task)
     num_train_epochs=5
-    output_dir="/mlx_devbox/users/linzhisheng.2021/ATTEMPT/attempt/result/stage1/"$task"_fp32"
+    output_dir="/mlx_devbox/users/linzhisheng.2021/ATTEMPT/attempt/result/adapter/stage1/"$task
 
     echo $task $num_train_epochs
         python run_seq2seq.py \
@@ -71,9 +73,17 @@ do
         --overwrite_output_dir=$overwrite_output_dir \
         --compute_memory=$compute_memory \
         --report_to="$report_to" \
-        --train_lora=$train_lora \
-        --add_lora=$add_lora \
         --add_task_embedding=$add_task_embedding \
+        --unfreeze_lm_head=false \
+        --unfreeze_layer_norms=false \
+        --add_adapter_in_feed_forward=false \
+        --add_adapter_in_feed_forward_out=true \
+        --add_adapter_in_self_attention=false \
+        --add_layer_norm_before_adapter=false \
+        --add_layer_norm_after_adapter=false \
+        --adapter_config_name="adapter" \
+        --train_task_adapters=true \
+        --task_reduction_factor=$task_reduction_factor \
         --logging_steps 10
     bash clean.sh $output_dir
 done

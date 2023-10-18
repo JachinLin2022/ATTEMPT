@@ -291,6 +291,7 @@ class T5DenseReluDense(nn.Module):
         self.config = config
         self.train_task_adapters = config.train_task_adapters and adapter_config.add_adapter_in_feed_forward_out
         self.add_lora = config.add_lora
+        self.task_prefix_len = config.task_embedding_len
         if config.add_lora:
             self.wi = nn.Linear(config.d_model, config.d_ff,
                             bias=False if not self.bitfit else True)
@@ -298,11 +299,14 @@ class T5DenseReluDense(nn.Module):
             self.wo = Linear(config.d_ff, config.d_model, 64, 64, 0, bias=False if not self.bitfit else True, merge_weights=False, lora_num=config.lora_num, task_prefix_len=config.task_embedding_len, is_decoder=config.is_decoder)
         else:
             if self.train_task_adapters:
-                adapter_config.reduction_factor = adapter_config.task_reduction_factor
+                adapter_config.reduction_factor = 48
                 adapter_config.input_dim = config.d_ff
-                # adapter_config.tasks = ['mnli']
                 adapter_config.tasks = config.source_task
                 self.adapter_controller = AdapterController(adapter_config)
+                self.temperature = 1
+                self.w_gate = nn.Parameter(torch.zeros(config.d_model if config.is_decoder else config.d_ff, len(config.source_task)), requires_grad=True)
+                nn.init.zeros_(self.w_gate)
+                self.softmax = nn.Softmax(dim=-1)
             self.wi = nn.Linear(config.d_model, config.d_ff,
                             bias=False if not self.bitfit else True)
             self.wo = nn.Linear(config.d_ff, config.d_model,
@@ -315,12 +319,33 @@ class T5DenseReluDense(nn.Module):
         hidden_states = self.wi(hidden_states)
         hidden_states = F.relu(hidden_states)
         hidden_states = self.dropout(hidden_states)
+
         if self.train_task_adapters:
-            task = 'qnli'
-            # task = self.config.source_task[0]
-            adapter_hidden_states = self.adapter_controller(hidden_states, task, residual)
+            # task = 'qnli'
+            gating_weights = None
+            if len(self.config.source_task) > 1:
+                if encoder_hidden_states is not None:
+                    gate_x = encoder_hidden_states[:,:self.task_prefix_len,:].mean(1).unsqueeze(1)
+                else:
+                    gate_x = hidden_states[:,:self.task_prefix_len,:].mean(1).unsqueeze(1)
+        
+                gete_out = gate_x @ self.w_gate
+                gating_weights = self.softmax(gete_out/self.temperature)
+
+                all_results = []
+                for task in self.config.source_task:
+                    all_results.append(self.adapter_controller(hidden_states, task, residual))
+                
+                adapter_hidden_states = torch.stack(all_results, dim=3) @ gating_weights.unsqueeze(3)
+                adapter_hidden_states = adapter_hidden_states.squeeze()
+                if len(adapter_hidden_states.shape) == 2:
+                    adapter_hidden_states = adapter_hidden_states.unsqueeze(1)
+            else:
+                task = self.config.source_task[0]
+                adapter_hidden_states = self.adapter_controller(hidden_states, task, residual)
             hidden_states = self.wo(hidden_states)
-            return hidden_states + adapter_hidden_states
+            return hidden_states + adapter_hidden_states, gating_weights
+        
         if self.add_lora:
             hidden_states = self.wo(hidden_states, moe_output, encoder_hidden_states)
             if isinstance(hidden_states, tuple):

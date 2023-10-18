@@ -93,9 +93,14 @@ class Seq2SeqTrainer(Seq2SeqTrainer, BaseTrainer):
                     outputs = model(**inputs,moe_output=moe_output)
             else:
                 outputs = model(**inputs,moe_output=moe_output)
-            # moe_output = np.array(moe_output[1:])
-            moe_output = np.array([e.cpu().numpy() for e in outputs['moe_weight']])
-            moe_output = moe_output.mean(1).mean(0).squeeze() if len(moe_output) > 0 else None
+            
+            if outputs['moe_weight'][0] is None:
+                moe_output = None
+            else:
+                moe_output = np.array([e.cpu().numpy() for e in outputs['moe_weight']])
+                moe_output = moe_output.mean(1).mean(0).squeeze()
+            
+
             if has_labels:
                 if self.label_smoother is not None:
                     loss = self.label_smoother(

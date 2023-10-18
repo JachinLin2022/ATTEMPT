@@ -34,16 +34,20 @@ add_lora=true
 
 big_task=(superglue-multirc)
 small_task=(superglue-cb superglue-wsc-fixed)
-lrs=(6e-4 1e-3)
+
 task_reduction_factor=16
 
 target_task=(scitail paws winogrande)
+
+
+lrs=(3e-4 6e-4 1e-3)
+target_task=(winogrande)
 for learning_rate in ${lrs[@]}
 do
     for task in ${target_task[@]}
     do
         t=($task)
-        num_train_epochs=5
+        num_train_epochs=20
         warmup_steps=0
         per_device_train_batch_size=128
         max_source_length=256
@@ -58,7 +62,7 @@ do
 
         load_lora_path="/mlx_devbox/users/linzhisheng.2021/ATTEMPT/attempt/result/stage1/mnli_fp32/lora.pt,/mlx_devbox/users/linzhisheng.2021/ATTEMPT/attempt/result/stage1/qnli_fp32/lora.pt,/mlx_devbox/users/linzhisheng.2021/ATTEMPT/attempt/result/stage1/qqp_fp32/lora.pt,/mlx_devbox/users/linzhisheng.2021/ATTEMPT/attempt/result/stage1/sst2_fp32/lora.pt"
         load_task_path="/mlx_devbox/users/linzhisheng.2021/ATTEMPT/attempt/result/stage1/mnli_fp32/task_embedding.pt,/mlx_devbox/users/linzhisheng.2021/ATTEMPT/attempt/result/stage1/qnli_fp32/task_embedding.pt,/mlx_devbox/users/linzhisheng.2021/ATTEMPT/attempt/result/stage1/qqp_fp32/task_embedding.pt,/mlx_devbox/users/linzhisheng.2021/ATTEMPT/attempt/result/stage1/sst2_fp32/task_embedding.pt"
-        output_dir="/mlx_devbox/users/linzhisheng.2021/ATTEMPT/attempt/result/stage2_softmax_4lora_factor16/"$learning_rate"_"$task"_"$per_device_train_batch_size"_"$task_reduction_factor
+        output_dir="/mlx_devbox/users/linzhisheng.2021/ATTEMPT/attempt/result/stage2_softmax_4lora_factor16_test/"$learning_rate"_"$task"_"$per_device_train_batch_size"_"$task_reduction_factor"_20"
 
         echo $task $num_train_epochs
             python run_seq2seq.py \
@@ -111,7 +115,6 @@ do
         bash clean.sh $output_dir
     done
 done
-
 
 # target_task=(superglue-wic)
 # task_reduction_factor=32

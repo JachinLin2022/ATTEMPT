@@ -35,9 +35,11 @@ add_lora=true
 big_task=(superglue-multirc)
 small_task=(superglue-cb superglue-wsc-fixed)
 lrs=(3e-4 6e-4 1e-3 5e-3)
-task_reduction_factor=32
 
-target_task=(cola mrpc)
+
+lrs=(3e-4)
+task_reduction_factor=16
+target_task=(cola)
 for task in ${target_task[@]}
 do
     for learning_rate in ${lrs[@]}
@@ -58,7 +60,7 @@ do
 
         load_lora_path="/mlx_devbox/users/linzhisheng.2021/ATTEMPT/attempt/result/stage1/mnli_fp32/lora.pt,/mlx_devbox/users/linzhisheng.2021/ATTEMPT/attempt/result/stage1/qnli_fp32/lora.pt,/mlx_devbox/users/linzhisheng.2021/ATTEMPT/attempt/result/stage1/qqp_fp32/lora.pt,/mlx_devbox/users/linzhisheng.2021/ATTEMPT/attempt/result/stage1/sst2_fp32/lora.pt"
         load_task_path="/mlx_devbox/users/linzhisheng.2021/ATTEMPT/attempt/result/stage1/mnli_fp32/task_embedding.pt,/mlx_devbox/users/linzhisheng.2021/ATTEMPT/attempt/result/stage1/qnli_fp32/task_embedding.pt,/mlx_devbox/users/linzhisheng.2021/ATTEMPT/attempt/result/stage1/qqp_fp32/task_embedding.pt,/mlx_devbox/users/linzhisheng.2021/ATTEMPT/attempt/result/stage1/sst2_fp32/task_embedding.pt"
-        output_dir="/mlx_devbox/users/linzhisheng.2021/ATTEMPT/attempt/result/stage2_softmax_4lora_factor32/"$learning_rate"_"$task"_"$per_device_train_batch_size"_"$task_reduction_factor
+        output_dir="/mlx_devbox/users/linzhisheng.2021/ATTEMPT/attempt/result/test/"$learning_rate"_"$task"_"$per_device_train_batch_size"_"$task_reduction_factor
 
         echo $task $num_train_epochs
             python run_seq2seq.py \

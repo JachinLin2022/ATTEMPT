@@ -258,7 +258,7 @@ def init_task_param(config, tokenizer):
     task_token_id = tokenizer(task_desc_map[task])['input_ids']
     config.task_embedding_len = len(task_token_id)
     config.task_embedding_init_token = task_token_id
-    print(f"task embedding len={config.task_embedding_len}, token={task_token_id}")
+    print(f"task embedding len={config.task_embedding_len}, token={task_token_id}, desc={task_desc_map[task]}")
 
 
 def modify_model_after_init(model:nn.Module, training_args, adapter_args, adapter_config):

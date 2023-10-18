@@ -879,12 +879,13 @@ class WinoGrande(AbstractTask):
     metric_names = ["accuracy"]
 
     def load_dataset(self, split):
+        print(777777777)
         return datasets.load_dataset('winogrande', "winogrande_xl", split=split)
 
     def preprocessor(self, example, add_prefix=True):
         src_texts = ["sentence:", example["sentence"],
                      "option0:", example["option1"],
-                     "option1:", example["option1"]]
+                     "option1:", example["option2"]]
         tgt_texts = [str(int(example["answer"]) - 1)]
         return self.seq2seq_format(src_texts, tgt_texts, add_prefix)
 
