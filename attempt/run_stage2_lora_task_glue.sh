@@ -28,17 +28,16 @@ overwrite_output_dir=true
 compute_memory=true
 report_to="none"
 add_lora=true
-
+add_task_embedding=true
 
 
 
 big_task=(superglue-multirc)
 small_task=(superglue-cb superglue-wsc-fixed)
-lrs=(3e-4 6e-4 1e-3 5e-3)
-
-
-lrs=(3e-4)
+lrs=(1e-3 6e-4 3e-4)
 task_reduction_factor=16
+target_task=(superglue-cb cola superglue-wsc-fixed superglue-cb mrpc stsb rte superglue-wic superglue-boolq)
+
 target_task=(cola)
 for task in ${target_task[@]}
 do
@@ -47,20 +46,24 @@ do
         t=($task)
         num_train_epochs=20
         warmup_steps=0
-        per_device_train_batch_size=128
+        per_device_train_batch_size=32
         max_source_length=256
         if [[ "${big_task[@]}" =~ "${task}" ]]; then
             num_train_epochs=10
             max_source_length=348
+            per_device_train_batch_size=100
         fi
 
         if [[ "${small_task[@]}" =~ "${task}" ]]; then
             per_device_train_batch_size=32
         fi
 
-        load_lora_path="/mlx_devbox/users/linzhisheng.2021/ATTEMPT/attempt/result/stage1/mnli_fp32/lora.pt,/mlx_devbox/users/linzhisheng.2021/ATTEMPT/attempt/result/stage1/qnli_fp32/lora.pt,/mlx_devbox/users/linzhisheng.2021/ATTEMPT/attempt/result/stage1/qqp_fp32/lora.pt,/mlx_devbox/users/linzhisheng.2021/ATTEMPT/attempt/result/stage1/sst2_fp32/lora.pt"
-        load_task_path="/mlx_devbox/users/linzhisheng.2021/ATTEMPT/attempt/result/stage1/mnli_fp32/task_embedding.pt,/mlx_devbox/users/linzhisheng.2021/ATTEMPT/attempt/result/stage1/qnli_fp32/task_embedding.pt,/mlx_devbox/users/linzhisheng.2021/ATTEMPT/attempt/result/stage1/qqp_fp32/task_embedding.pt,/mlx_devbox/users/linzhisheng.2021/ATTEMPT/attempt/result/stage1/sst2_fp32/task_embedding.pt"
-        output_dir="/mlx_devbox/users/linzhisheng.2021/ATTEMPT/attempt/result/test/"$learning_rate"_"$task"_"$per_device_train_batch_size"_"$task_reduction_factor
+        load_lora_path="/mlx_devbox/users/linzhisheng.2021/ATTEMPT/attempt/result/stage1_no_prefix/mnli/lora.pt,/mlx_devbox/users/linzhisheng.2021/ATTEMPT/attempt/result/stage1_no_prefix/qnli/lora.pt,/mlx_devbox/users/linzhisheng.2021/ATTEMPT/attempt/result/stage1_no_prefix/qqp/lora.pt,/mlx_devbox/users/linzhisheng.2021/ATTEMPT/attempt/result/stage1_no_prefix/sst2/lora.pt"
+        # load_lora_path="/mlx_devbox/users/linzhisheng.2021/ATTEMPT/attempt/result/stage1/mnli_fp32/lora.pt,/mlx_devbox/users/linzhisheng.2021/ATTEMPT/attempt/result/stage1/qnli_fp32/lora.pt,/mlx_devbox/users/linzhisheng.2021/ATTEMPT/attempt/result/stage1/qqp_fp32/lora.pt,/mlx_devbox/users/linzhisheng.2021/ATTEMPT/attempt/result/stage1/sst2_fp32/lora.pt"
+        # load_lora_path="/mlx_devbox/users/linzhisheng.2021/ATTEMPT/attempt/outputs/lora2/lora_mnli/lora.pt,/mlx_devbox/users/linzhisheng.2021/ATTEMPT/attempt/outputs/lora2/lora_qnli/lora.pt,/mlx_devbox/users/linzhisheng.2021/ATTEMPT/attempt/outputs/lora2/lora_qqp/lora.pt,/mlx_devbox/users/linzhisheng.2021/ATTEMPT/attempt/outputs/lora2/lora_sst2/lora.pt"
+
+        load_task_path="/mlx_devbox/users/linzhisheng.2021/ATTEMPT/attempt/result/stage1_no_prefix/mnli/task_embedding.pt,/mlx_devbox/users/linzhisheng.2021/ATTEMPT/attempt/result/stage1_no_prefix/qnli/task_embedding.pt,/mlx_devbox/users/linzhisheng.2021/ATTEMPT/attempt/result/stage1_no_prefix/qqp/task_embedding.pt,/mlx_devbox/users/linzhisheng.2021/ATTEMPT/attempt/result/stage1_no_prefix/sst2/task_embedding.pt"
+        output_dir="/mlx_devbox/users/linzhisheng.2021/ATTEMPT/attempt/result/stage2_no_prefix_with_task_moe_loss_new/"$learning_rate"_"$task"_"$per_device_train_batch_size"_"$task_reduction_factor_"add"
 
         echo $task $num_train_epochs
             python run_seq2seq.py \
@@ -106,20 +109,22 @@ do
             --add_layer_norm_before_adapter=false \
             --add_layer_norm_after_adapter=false \
             --add_lora=$add_lora \
-            --add_task_embedding=true \
+            --add_task_embedding=$add_task_embedding \
             --load_task_path=$load_task_path \
             --logging_steps 10 \
-            --load_lora_path=$load_lora_path
+            --init_task_from_vocab=true \
+            --load_lora_path=$load_lora_path \
+            --seed 42
         bash clean.sh $output_dir
     done
 done
 
 
-# target_task=(superglue-wic)
-# task_reduction_factor=32
-# for learning_rate in ${lrs[@]}
+# lrs=(6e-4 1e-3)
+# target_task=(scitail paws winogrande yelp_polarity)
+# for task in ${target_task[@]}
 # do
-#     for task in ${target_task[@]}
+#     for learning_rate in ${lrs[@]}
 #     do
 #         t=($task)
 #         num_train_epochs=20
@@ -131,12 +136,15 @@ done
 #             max_source_length=348
 #         fi
 
-#         # if [[ "${small_task[@]}" =~ "${task}" ]]; then
-#         #     per_device_train_batch_size=32
-#         # fi
-#         load_lora_path="/mlx_devbox/users/linzhisheng.2021/ATTEMPT/attempt/result/stage1/mnli_fp32/lora.pt,/mlx_devbox/users/linzhisheng.2021/ATTEMPT/attempt/result/stage1/qnli_fp32/lora.pt,/mlx_devbox/users/linzhisheng.2021/ATTEMPT/attempt/result/stage1/qqp_fp32/lora.pt,/mlx_devbox/users/linzhisheng.2021/ATTEMPT/attempt/result/stage1/sst2_fp32/lora.pt"
+#         if [[ "${small_task[@]}" =~ "${task}" ]]; then
+#             per_device_train_batch_size=32
+#         fi
+
+#         # load_lora_path="/mlx_devbox/users/linzhisheng.2021/ATTEMPT/attempt/result/stage1/mnli_fp32/lora.pt,/mlx_devbox/users/linzhisheng.2021/ATTEMPT/attempt/result/stage1/qnli_fp32/lora.pt,/mlx_devbox/users/linzhisheng.2021/ATTEMPT/attempt/result/stage1/qqp_fp32/lora.pt,/mlx_devbox/users/linzhisheng.2021/ATTEMPT/attempt/result/stage1/sst2_fp32/lora.pt"
+#         load_lora_path="/mlx_devbox/users/linzhisheng.2021/ATTEMPT/attempt/outputs/lora2/lora_mnli/lora.pt,/mlx_devbox/users/linzhisheng.2021/ATTEMPT/attempt/outputs/lora2/lora_qnli/lora.pt,/mlx_devbox/users/linzhisheng.2021/ATTEMPT/attempt/outputs/lora2/lora_qqp/lora.pt,/mlx_devbox/users/linzhisheng.2021/ATTEMPT/attempt/outputs/lora2/lora_sst2/lora.pt"
+
 #         load_task_path="/mlx_devbox/users/linzhisheng.2021/ATTEMPT/attempt/result/stage1/mnli_fp32/task_embedding.pt,/mlx_devbox/users/linzhisheng.2021/ATTEMPT/attempt/result/stage1/qnli_fp32/task_embedding.pt,/mlx_devbox/users/linzhisheng.2021/ATTEMPT/attempt/result/stage1/qqp_fp32/task_embedding.pt,/mlx_devbox/users/linzhisheng.2021/ATTEMPT/attempt/result/stage1/sst2_fp32/task_embedding.pt"
-#         output_dir="/mlx_devbox/users/linzhisheng.2021/ATTEMPT/attempt/result/stage2_softmax_4lora_128/"$learning_rate"_"$task"_"$per_device_train_batch_size"_"$task_reduction_factor
+#         output_dir="/mlx_devbox/users/linzhisheng.2021/ATTEMPT/attempt/result/test_42_no_task_origin/"$learning_rate"_"$task"_"$per_device_train_batch_size"_"$task_reduction_factor
 
 #         echo $task $num_train_epochs
 #             python run_seq2seq.py \
@@ -182,12 +190,12 @@ done
 #             --add_layer_norm_before_adapter=false \
 #             --add_layer_norm_after_adapter=false \
 #             --add_lora=$add_lora \
-#             --add_task_embedding=true \
+#             --add_task_embedding=false \
 #             --load_task_path=$load_task_path \
 #             --logging_steps 10 \
-#             --load_lora_path=$load_lora_path
+#             --init_task_from_vocab=true \
+#             --load_lora_path=$load_lora_path \
+#             --seed 42
 #         bash clean.sh $output_dir
 #     done
 # done
-
-

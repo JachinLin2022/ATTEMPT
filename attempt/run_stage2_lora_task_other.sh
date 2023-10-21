@@ -11,7 +11,7 @@ model_name_or_path="t5-base"
 tokenizer_name="t5-base"
 save_total_limit=1
 per_device_train_batch_size=128
-per_device_eval_batch_size=256
+per_device_eval_batch_size=128
 load_best_model_at_end=true
 metric_for_best_model="average_metrics"
 greater_is_better=true
@@ -41,7 +41,7 @@ target_task=(scitail paws winogrande)
 
 
 lrs=(3e-4 6e-4 1e-3)
-target_task=(winogrande)
+target_task=(scitail paws winogrande yelp_polarity)
 for learning_rate in ${lrs[@]}
 do
     for task in ${target_task[@]}
@@ -49,7 +49,7 @@ do
         t=($task)
         num_train_epochs=20
         warmup_steps=0
-        per_device_train_batch_size=128
+        per_device_train_batch_size=64
         max_source_length=256
         if [[ "${big_task[@]}" =~ "${task}" ]]; then
             num_train_epochs=10
@@ -62,7 +62,7 @@ do
 
         load_lora_path="/mlx_devbox/users/linzhisheng.2021/ATTEMPT/attempt/result/stage1/mnli_fp32/lora.pt,/mlx_devbox/users/linzhisheng.2021/ATTEMPT/attempt/result/stage1/qnli_fp32/lora.pt,/mlx_devbox/users/linzhisheng.2021/ATTEMPT/attempt/result/stage1/qqp_fp32/lora.pt,/mlx_devbox/users/linzhisheng.2021/ATTEMPT/attempt/result/stage1/sst2_fp32/lora.pt"
         load_task_path="/mlx_devbox/users/linzhisheng.2021/ATTEMPT/attempt/result/stage1/mnli_fp32/task_embedding.pt,/mlx_devbox/users/linzhisheng.2021/ATTEMPT/attempt/result/stage1/qnli_fp32/task_embedding.pt,/mlx_devbox/users/linzhisheng.2021/ATTEMPT/attempt/result/stage1/qqp_fp32/task_embedding.pt,/mlx_devbox/users/linzhisheng.2021/ATTEMPT/attempt/result/stage1/sst2_fp32/task_embedding.pt"
-        output_dir="/mlx_devbox/users/linzhisheng.2021/ATTEMPT/attempt/result/stage2_softmax_4lora_factor16_test/"$learning_rate"_"$task"_"$per_device_train_batch_size"_"$task_reduction_factor"_20"
+        output_dir="/mlx_devbox/users/linzhisheng.2021/ATTEMPT/attempt/result/stage2_random_init/"$learning_rate"_"$task"_"$per_device_train_batch_size"_"$task_reduction_factor"_20"
 
         echo $task $num_train_epochs
             python run_seq2seq.py \
@@ -110,6 +110,7 @@ do
             --add_lora=$add_lora \
             --add_task_embedding=true \
             --load_task_path=$load_task_path \
+            --init_task_from_vocab=false \
             --logging_steps 10 \
             --load_lora_path=$load_lora_path
         bash clean.sh $output_dir

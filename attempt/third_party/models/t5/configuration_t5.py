@@ -14,6 +14,7 @@ class T5Config(T5Config):
                  task_embedding_len = None,
                  task_embedding_init_token = None,
                  load_task_path = None,
+                 init_task_from_vocab = None,
                  **kwargs):
         super().__init__(**kwargs)
         self.train_task_adapters = train_task_adapters
@@ -28,3 +29,4 @@ class T5Config(T5Config):
         self.task_embedding_len = task_embedding_len
         self.task_embedding_init_token = task_embedding_init_token
         self.load_task_path = load_task_path
+        self.init_task_from_vocab = init_task_from_vocab

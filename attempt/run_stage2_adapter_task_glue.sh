@@ -38,6 +38,7 @@ lrs=(3e-4 6e-4 1e-3 5e-3)
 
 task_reduction_factor=16
 target_task=(superglue-cb superglue-wsc-fixed cola rte mrpc stsb superglue-wic superglue-boolq superglue-multirc)
+target_task=(superglue-cb)
 for task in ${target_task[@]}
 do
     for learning_rate in ${lrs[@]}

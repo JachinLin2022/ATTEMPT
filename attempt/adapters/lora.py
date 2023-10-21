@@ -208,6 +208,8 @@ class Linear(nn.Linear, LoRALayer):
             return w.transpose(0, 1) if self.fan_in_fan_out else w
         if self.r > 0 and not self.merged:
             result = F.linear(x, T(self.weight), bias=self.bias)
+            gating_weights = None
+            all_results=None
             if self.lora_num == 1:         
                 result += (self.lora_dropout(x) @ self.lora_A.transpose(0, 1) @ self.lora_B.transpose(0, 1)) * self.scaling
             else:
@@ -265,7 +267,7 @@ class Linear(nn.Linear, LoRALayer):
                 if len(final_output.shape) == 2:
                     final_output = final_output.unsqueeze(1)
                 result += final_output
-            return result, gating_weights
+            return result, gating_weights, all_results
         else:
             return F.linear(x, T(self.weight), bias=self.bias)
 

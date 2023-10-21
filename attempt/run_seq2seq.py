@@ -17,7 +17,7 @@ Fine-tuning the library models for sequence to sequence.
 """
 # You can also adapt this script on your own sequence to sequence task. Pointers for this are left as comments.
 import os
-os.environ["CUDA_VISIBLE_DEVICES"] = "0,1,2,6"
+os.environ["CUDA_VISIBLE_DEVICES"] = "0,1,2,5"
 # os.environ["CUDA_VISIBLE_DEVICES"] = "4,5"
 from adapters.lora import adapter_state_dict, lora_state_dict, task_embedding_state_dict
 from utils import modify_model_after_init, save_training_config, save_prompts, init_task_param
@@ -163,6 +163,7 @@ def main():
     config.lora_num = len(adapter_args.load_lora_path.split(',')) if adapter_args.load_lora_path else 1
     config.add_task_embedding = adapter_args.add_task_embedding
     config.load_task_path = adapter_args.load_task_path
+    config.init_task_from_vocab = adapter_args.init_task_from_vocab
     # Set tokenizer
     tokenizer = AutoTokenizer.from_pretrained(
         model_args.tokenizer_name if model_args.tokenizer_name else model_args.model_name_or_path,
@@ -300,7 +301,7 @@ def main():
                                            seed=data_args.data_seed).get(
                 split="train",
                 split_validation_test=training_args.split_validation_test,
-                add_prefix=True if adapter_args.train_task_adapters else True,
+                add_prefix=True if adapter_args.add_lora else False,
                 n_obs=data_args.max_train_samples, lang=data_args.lang_name, file_name=train_file, few_shot=data_args.few_shot)
                 for dataset_name, dataset_config_name, train_file
                 in zip(data_args.dataset_name, data_args.dataset_config_name, data_args.train_files)]
@@ -310,7 +311,7 @@ def main():
                                            seed=data_args.data_seed).get(
                 split="train",
                 split_validation_test=training_args.split_validation_test,
-                add_prefix=True if adapter_args.train_task_adapters else True,
+                add_prefix=True if adapter_args.add_lora else False,
                 n_obs=data_args.max_train_samples, lang=data_args.lang_name, file_name=data_args.train_file, few_shot=data_args.few_shot)
                 for dataset_name, dataset_config_name
                 in zip(data_args.dataset_name, data_args.dataset_config_name)]
@@ -354,7 +355,7 @@ def main():
                                                         seed=data_args.data_seed).get(
                 split="validation",
                 split_validation_test=training_args.split_validation_test,
-                add_prefix=True if adapter_args.train_task_adapters else True,
+                add_prefix=True if adapter_args.add_lora else False,
                 n_obs=data_args.max_val_samples, lang=data_args.lang_name, file_name=validation_file)
                 for eval_dataset, eval_dataset_config, validation_file in zip(data_args.eval_dataset_name, data_args.eval_dataset_config_name, data_args.validation_files)}
         else:
@@ -362,7 +363,7 @@ def main():
                                                         seed=data_args.data_seed).get(
                 split="validation",
                 split_validation_test=training_args.split_validation_test,
-                add_prefix=True if adapter_args.train_task_adapters else True,
+                add_prefix=True if adapter_args.add_lora else False,
                 n_obs=data_args.max_val_samples, lang=data_args.lang_name, file_name=data_args.validation_file)
                 for eval_dataset, eval_dataset_config in zip(data_args.eval_dataset_name, data_args.eval_dataset_config_name)}
 
@@ -399,7 +400,7 @@ def main():
                                                         seed=data_args.data_seed).get(
                 split="test",
                 split_validation_test=training_args.split_validation_test,
-                add_prefix=True if adapter_args.train_task_adapters else True,
+                add_prefix=True if adapter_args.add_lora else False,
                 n_obs=data_args.max_test_samples, lang=data_args.lang_name, file_name=test_file)
                 for test_dataset, test_dataset_config, test_file in zip(data_args.test_dataset_name, data_args.test_dataset_config_name, data_args.test_files)}
         else:
@@ -407,7 +408,7 @@ def main():
                                                         seed=data_args.data_seed).get(
                 split="test",
                 split_validation_test=training_args.split_validation_test,
-                add_prefix=True if adapter_args.train_task_adapters else True,
+                add_prefix=True if adapter_args.add_lora else False,
                 n_obs=data_args.max_test_samples, lang=data_args.lang_name, file_name=data_args.test_file)
                 for test_dataset, test_dataset_config in zip(data_args.test_dataset_name, data_args.test_dataset_config_name)}
         for index in random.sample(range(len(test_datasets[data_args.test_dataset_name[0]])), 3):

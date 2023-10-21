@@ -11,7 +11,7 @@ model_name_or_path="t5-base"
 tokenizer_name="t5-base"
 save_total_limit=1
 per_device_train_batch_size=128
-per_device_eval_batch_size=256
+per_device_eval_batch_size=128
 load_best_model_at_end=true
 metric_for_best_model="average_metrics"
 greater_is_better=true
@@ -35,14 +35,14 @@ big_task=(superglue-multirc)
 small_task=(superglue-cb superglue-wsc-fixed)
 target_task=(cola rte stsb mrpc superglue-cb superglue-multirc superglue-wsc-fixed superglue-boolq superglue-wic)
 
-target_task=(superglue-wsc-fixed superglue-wic)
+target_task=(cola rte stsb mrpc superglue-cb superglue-multirc superglue-wsc-fixed superglue-boolq superglue-wic)
 
 for task in ${target_task[@]}
 do
     t=($task)
     num_train_epochs=20
     warmup_steps=0
-    per_device_train_batch_size=128
+    per_device_train_batch_size=64
     max_source_length=256
     if [[ "${big_task[@]}" =~ "${task}" ]]; then
         num_train_epochs=10
@@ -51,7 +51,7 @@ do
     if [[ "${small_task[@]}" =~ "${task}" ]]; then
         per_device_train_batch_size=32
     fi
-    output_dir="/mlx_devbox/users/linzhisheng.2021/ATTEMPT/attempt/result/finetuning_prefix/"$learning_rate"_"$task"_"$per_device_train_batch_size
+    output_dir="/mlx_devbox/users/linzhisheng.2021/ATTEMPT/attempt/result/finetuning_no_prefix/"$learning_rate"_"$task"_"$per_device_train_batch_size
     echo $task $num_train_epochs
         python run_seq2seq.py \
         --do_train=$do_train \

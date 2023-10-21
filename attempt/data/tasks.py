@@ -184,7 +184,7 @@ class AbstractTask(abc.ABC):
             # shuffles the data and samples it.
             if n_obs is not None or few_shot is not None:
                 dataset = self.subsample(dataset, n_obs, None, few_shot)
-        return self.map_dataset(dataset, add_prefix)
+        return self.map_dataset(dataset, False)
 
 
 class Squad(AbstractTask):
@@ -411,6 +411,7 @@ class COLA(AbstractTask):
     def preprocessor(self, example, add_prefix=True):
         src_texts = ["sentence:", example['sentence']]
         tgt_texts = [self.labels_map[int(example['label'])]]
+        # tgt_texts = [str(example['label'])]
         return self.seq2seq_format(src_texts, tgt_texts, add_prefix)
 
 
@@ -677,6 +678,7 @@ class SuperGLUECB(AbstractTask):
         src_texts = ["premise:", example["premise"],
                      "hypothesis:", example["hypothesis"]]
         tgt_texts = [self.labels_map[int(example['label'])]]
+        # tgt_texts = [str(example['label'])]
         return self.seq2seq_format(src_texts, tgt_texts, add_prefix)
 
 

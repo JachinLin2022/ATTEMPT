@@ -30,6 +30,8 @@ class AdapterTrainingArguments:
         default=None, metadata={"help": "task path"}
     )
 
+    init_task_from_vocab: Optional[bool] = field(default=True,
+                                                metadata={"help": "If set, init task from task desc."})
     load_adapter_path: Optional[str] = field(
         default=None, metadata={"help": "config name for the adapter layers, should be selected "
                                      f"in {sorted(ADAPTER_CONFIG_MAPPING.keys())}."}

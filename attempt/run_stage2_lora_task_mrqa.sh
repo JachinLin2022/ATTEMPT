@@ -11,7 +11,7 @@ model_name_or_path="t5-base"
 tokenizer_name="t5-base"
 save_total_limit=1
 per_device_train_batch_size=128
-per_device_eval_batch_size=128
+per_device_eval_batch_size=64
 load_best_model_at_end=true
 metric_for_best_model="average_metrics"
 greater_is_better=true
@@ -34,10 +34,10 @@ add_lora=true
 
 big_task=(superglue-multirc)
 small_task=(superglue-cb superglue-wsc-fixed)
-lrs=(6e-4 1e-3)
+lrs=(6e-4)
 task_reduction_factor=16
 
-target_task=(newsqa hotpotqa nq searchqa)
+target_task=(hotpotqa nq)
 for learning_rate in ${lrs[@]}
 do
     for task in ${target_task[@]}
@@ -45,7 +45,7 @@ do
         t=($task)
         num_train_epochs=5
         warmup_steps=0
-        per_device_train_batch_size=64
+        per_device_train_batch_size=16
         max_source_length=512
         if [[ "${big_task[@]}" =~ "${task}" ]]; then
             num_train_epochs=10
@@ -58,7 +58,7 @@ do
 
         load_lora_path="/mlx_devbox/users/linzhisheng.2021/ATTEMPT/attempt/result/stage1/squad_fp32/lora.pt,/mlx_devbox/users/linzhisheng.2021/ATTEMPT/attempt/result/stage1/superglue-record_fp32/lora.pt"
         load_task_path="/mlx_devbox/users/linzhisheng.2021/ATTEMPT/attempt/result/stage1/squad_fp32/task_embedding.pt,/mlx_devbox/users/linzhisheng.2021/ATTEMPT/attempt/result/stage1/superglue-record_fp32/task_embedding.pt"
-        output_dir="/mlx_devbox/users/linzhisheng.2021/ATTEMPT/attempt/result/stage2_softmax_2lora_factor16/"$learning_rate"_"$task"_"$per_device_train_batch_size"_"$task_reduction_factor
+        output_dir="/mlx_devbox/users/linzhisheng.2021/ATTEMPT/attempt/result/stage2_random_init/"$learning_rate"_"$task"_"$per_device_train_batch_size"_"$task_reduction_factor
 
         echo $task $num_train_epochs
             python run_seq2seq.py \
@@ -105,6 +105,7 @@ do
             --add_layer_norm_after_adapter=false \
             --add_lora=$add_lora \
             --add_task_embedding=true \
+            --init_task_from_vocab=false \
             --load_task_path=$load_task_path \
             --logging_steps 10 \
             --load_lora_path=$load_lora_path
