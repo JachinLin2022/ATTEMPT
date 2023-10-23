@@ -98,14 +98,24 @@ def f1_score_with_invalid(predictions, targets) -> dict:
     def binary_reverse(labels):
         return ['0' if label == '1' else '1' for label in labels]
     unique_labels = list(set(predictions + targets))
-    replace_dict = {label: index for index, label in enumerate(unique_labels)}
-
+    
+    replace_dict = {
+        'False': '0',
+        'True': '1'
+    }
+    index = 2
+    for label in unique_labels:
+        if label not in ['False','True']:
+            replace_dict[label] = str(index)
+            index = index + 1
+    
     predictions = [replace_dict[x] for x in predictions]
     targets = [replace_dict[x] for x in targets]
 
     targets, predictions = np.asarray(targets), np.asarray(predictions)
     # Get indices of invalid predictions.
     invalid_idx_mask = np.logical_and(predictions != '0', predictions != '1')
+    print(replace_dict)
     # For any prediction != 0 or 1, we set the prediction to the opposite of its corresponding target.
     predictions[invalid_idx_mask] = binary_reverse(targets[invalid_idx_mask])
     targets = targets.astype(np.int32)
