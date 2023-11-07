@@ -18,7 +18,7 @@ greater_is_better=true
 evaluation_strategy="epoch"
 non_linearity="gelu_new"
 max_source_length=256
-learning_rate=5e-4
+learning_rate=3e-4
 split_validation_test=true
 dataset_config_name=("en")
 eval_dataset_config_name=("en")
@@ -27,32 +27,30 @@ predict_with_generate=true
 overwrite_output_dir=true
 compute_memory=true
 report_to="none"
+add_lora=true
 add_task_embedding=true
-export CUDA_VISIBLE_DEVICES="2"
+export CUDA_VISIBLE_DEVICES="0,1,2,3"
 export http_proxy='http://127.0.0.1:7890'
 export https_proxy='http://127.0.0.1:7890'
 
 big_task=(superglue-multirc)
 small_task=(superglue-cb superglue-wsc-fixed)
 qa_task=(nq newsqa searchqa hotpotqa) 
-lrs=(5e-3)
+lrs=(1e-3 6e-4)
 task_reduction_factor=16
 target_task=(superglue-cb cola superglue-wsc-fixed mrpc stsb rte superglue-wic superglue-boolq superglue-multirc)
 target_task=(newsqa searchqa hotpotqa)
-target_task=(cola rte superglue-cb superglue-wsc-fixed mrpc stsb superglue-wic superglue-boolq superglue-multirc)
 
-seed=42
-target_task=(superglue-wic)
+target_task=(rte superglue-cb cola superglue-wsc-fixed mrpc stsb superglue-wic superglue-boolq superglue-multirc)
 echo $CUDA_VISIBLE_DEVICES
 for task in ${target_task[@]}
 do
     for learning_rate in ${lrs[@]}
     do
         t=($task)
-
         num_train_epochs=20
         warmup_steps=0
-        per_device_train_batch_size=32
+        per_device_train_batch_size=128
         max_source_length=256
         if [[ "${big_task[@]}" =~ "${task}" ]]; then
             num_train_epochs=10
@@ -76,11 +74,10 @@ do
             per_device_train_batch_size=100
         fi
 
-        load_adapter_path="/home/linzhisheng/ATTEMPT/attempt/result/adapter/stage1/mnli/adapter.pt,/home/linzhisheng/ATTEMPT/attempt/result/adapter/stage1/qnli/adapter.pt,/home/linzhisheng/ATTEMPT/attempt/result/adapter/stage1/qqp/adapter.pt,/home/linzhisheng/ATTEMPT/attempt/result/adapter/stage1/sst2/adapter.pt,/home/linzhisheng/ATTEMPT/attempt/result/adapter/stage1/squad/adapter.pt,/home/linzhisheng/ATTEMPT/attempt/result/adapter/stage1/superglue-record/adapter.pt"
-        load_task_path="/home/linzhisheng/ATTEMPT/attempt/result/adapter/stage1/mnli/task_embedding.pt,/home/linzhisheng/ATTEMPT/attempt/result/adapter/stage1/qnli/task_embedding.pt,/home/linzhisheng/ATTEMPT/attempt/result/adapter/stage1/qqp/task_embedding.pt,/home/linzhisheng/ATTEMPT/attempt/result/adapter/stage1/sst2/task_embedding.pt,/home/linzhisheng/ATTEMPT/attempt/result/adapter/stage1/squad/task_embedding.pt,/home/linzhisheng/ATTEMPT/attempt/result/adapter/stage1/superglue-record/task_embedding.pt"
-        output_dir="/home/linzhisheng/ATTEMPT/attempt/result/adapter/adapter/stage2_$seed/$task/"$learning_rate"_"$per_device_train_batch_size"_"$task_reduction_factor"_"$CUDA_VISIBLE_DEVICES
-
-        
+        # 6lora init
+        load_lora_path="/home/linzhisheng/ATTEMPT/attempt/result/stage1_random/mnli/lora.pt,/home/linzhisheng/ATTEMPT/attempt/result/stage1_random/qnli/lora.pt,/home/linzhisheng/ATTEMPT/attempt/result/stage1_random/qqp/lora.pt,/home/linzhisheng/ATTEMPT/attempt/result/stage1_random/sst2/lora.pt,/home/linzhisheng/ATTEMPT/attempt/result/stage1_random/squad/lora.pt,/home/linzhisheng/ATTEMPT/attempt/result/stage1_random/superglue-record/lora.pt"
+        load_task_path="/home/linzhisheng/ATTEMPT/attempt/result/stage1_random/mnli/task_embedding.pt,/home/linzhisheng/ATTEMPT/attempt/result/stage1_random/qnli/task_embedding.pt,/home/linzhisheng/ATTEMPT/attempt/result/stage1_random/qqp/task_embedding.pt,/home/linzhisheng/ATTEMPT/attempt/result/stage1_random/sst2/task_embedding.pt,/home/linzhisheng/ATTEMPT/attempt/result/stage1_random/squad/task_embedding.pt,/home/linzhisheng/ATTEMPT/attempt/result/stage1_random/superglue-record/task_embedding.pt"
+        output_dir="/home/linzhisheng/ATTEMPT/attempt/result/stage2_init_from_random_4gpu/$task/"$learning_rate"_"$per_device_train_batch_size"_"$task_reduction_factor"_"$CUDA_VISIBLE_DEVICES
 
         while true
         do
@@ -117,21 +114,23 @@ do
                 --overwrite_output_dir=$overwrite_output_dir \
                 --compute_memory=$compute_memory \
                 --report_to="$report_to" \
-                --add_task_embedding=$add_task_embedding \
-                --unfreeze_lm_head=false \
-                --unfreeze_layer_norms=true \
-                --add_adapter_in_feed_forward=true \
-                --add_adapter_in_feed_forward_out=true \
-                --add_adapter_in_self_attention=false \
-                --add_layer_norm_before_adapter=false \
-                --add_layer_norm_after_adapter=false \
                 --adapter_config_name="adapter" \
                 --train_task_adapters=true \
                 --task_reduction_factor=$task_reduction_factor \
-                --load_adapter_path=$load_adapter_path \
+                --unfreeze_lm_head=false \
+                --unfreeze_layer_norms=true \
+                --add_adapter_in_feed_forward=true \
+                --add_adapter_in_feed_forward_out=false \
+                --add_adapter_in_self_attention=false \
+                --add_layer_norm_before_adapter=false \
+                --add_layer_norm_after_adapter=false \
+                --add_lora=$add_lora \
+                --add_task_embedding=$add_task_embedding \
                 --load_task_path=$load_task_path \
-                --init_task_from_vocab=true \
-                --logging_steps 10
+                --logging_steps 10 \
+                --init_task_from_vocab=false \
+                --load_lora_path=$load_lora_path \
+                --seed 42
             if [[ $? -eq 0 ]]; then
                 # 如果脚本正常退出，则跳出循环
                 break

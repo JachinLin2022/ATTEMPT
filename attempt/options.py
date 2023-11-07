@@ -140,6 +140,17 @@ class AdapterTrainingArguments:
             "help": "attention model for attn_prefix"
         },
     )
+    # adamix
+    adapter_size: Optional[int] = field(
+        default=None, metadata={"help": "Adamix config"})
+    num_experts: Optional[int] = field(
+        default=None, metadata={"help": "Adamix config"})
+    inference_level: Optional[int] = field(
+        default=None, metadata={"help": "Adamix config"})
+    sharing_down: Optional[int] = field(
+        default=None, metadata={"help": "Adamix config"})
+    sharing_up: Optional[int] = field(
+        default=None, metadata={"help": "Adamix config"})
 
 
 @dataclass

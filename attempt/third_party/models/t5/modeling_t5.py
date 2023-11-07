@@ -47,7 +47,7 @@ from transformers.utils import logging
 from transformers.utils.model_parallel_utils import assert_device_map, get_device_map
 from .configuration_t5 import T5Config
 
-from adapters import AdapterController,Linear
+from adapters import AdapterController,Linear,ExpertSoup
 from typing import Dict, Any, List, Tuple, Optional
 
 logger = logging.get_logger(__name__)
@@ -291,6 +291,7 @@ class T5DenseReluDense(nn.Module):
         self.bitfit = adapter_config.bitfit if adapter_config is not None else False
         self.config = config
         self.train_task_adapters = config.train_task_adapters and adapter_config.add_adapter_in_feed_forward_out
+        self.apply_expert_soup = True if config.num_experts is not None else False
         self.add_lora = config.add_lora
         self.task_prefix_len = config.task_embedding_len
         if config.add_lora:
@@ -304,10 +305,17 @@ class T5DenseReluDense(nn.Module):
                 adapter_config.input_dim = config.d_ff
                 adapter_config.tasks = config.source_task
                 self.adapter_controller = AdapterController(adapter_config)
-                self.temperature = 1
-                self.w_gate = nn.Parameter(torch.zeros(config.d_model if config.is_decoder else config.d_ff, len(config.source_task)), requires_grad=True)
-                nn.init.zeros_(self.w_gate)
-                self.softmax = nn.Softmax(dim=-1)
+                if len(self.config.source_task) > 1:
+                    print('using adapter moe')
+                    self.temperature = 1
+                    self.w_gate = nn.Parameter(torch.zeros(config.d_model if config.is_decoder else config.d_ff, len(config.source_task)), requires_grad=True)
+                    nn.init.zeros_(self.w_gate)
+                    self.softmax = nn.Softmax(dim=-1)
+            
+            if self.apply_expert_soup:
+                self.ExpertSoup = ExpertSoup(config.d_model, config.adapter_size, 'gelu', num_expert=config.num_experts,
+                                         inference_level=config.inference_level, sharing_down=config.sharing_down,
+                                         sharing_up=config.sharing_up)
             self.wi = nn.Linear(config.d_model, config.d_ff,
                             bias=False if not self.bitfit else True)
             self.wo = nn.Linear(config.d_ff, config.d_model,
@@ -321,7 +329,11 @@ class T5DenseReluDense(nn.Module):
         hidden_states = F.relu(hidden_states)
         hidden_states = self.dropout(hidden_states)
 
+        moe_weight = None
+        all_result = None
+        
         if self.train_task_adapters:
+            # stage2_adapter
             # task = 'qnli'
             gating_weights = None
             if len(self.config.source_task) > 1:
@@ -333,11 +345,11 @@ class T5DenseReluDense(nn.Module):
                 gete_out = gate_x @ self.w_gate
                 gating_weights = self.softmax(gete_out/self.temperature)
 
-                all_results = []
+                all_result = []
                 for task in self.config.source_task:
-                    all_results.append(self.adapter_controller(hidden_states, task, residual))
+                    all_result.append(self.adapter_controller(hidden_states, task, residual))
                 
-                adapter_hidden_states = torch.stack(all_results, dim=3) @ gating_weights.unsqueeze(3)
+                adapter_hidden_states = torch.stack(all_result, dim=3) @ gating_weights.unsqueeze(3)
                 adapter_hidden_states = adapter_hidden_states.squeeze()
                 if len(adapter_hidden_states.shape) == 2:
                     adapter_hidden_states = adapter_hidden_states.unsqueeze(1)
@@ -345,18 +357,22 @@ class T5DenseReluDense(nn.Module):
                 task = self.config.source_task[0]
                 adapter_hidden_states = self.adapter_controller(hidden_states, task, residual)
             hidden_states = self.wo(hidden_states)
-            return hidden_states + adapter_hidden_states, gating_weights
+            return hidden_states + adapter_hidden_states, gating_weights, all_result
         
-        moe_weight = None
-        all_result = None
         if self.add_lora:
+            # stage2_lora
             hidden_states = self.wo(hidden_states, moe_output, encoder_hidden_states)
             if isinstance(hidden_states, tuple):
                 all_result = hidden_states[2]
                 moe_weight = hidden_states[1]
-                hidden_states = hidden_states[0]
+                hidden_states = hidden_states[0]    
         else:
             hidden_states = self.wo(hidden_states)
+            if self.apply_expert_soup:
+                hidden_states = self.ExpertSoup(hidden_states, residual=hidden_states)
+            
+        
+            
         return hidden_states, moe_weight, all_result
 
 
@@ -1939,6 +1955,7 @@ class T5ForConditionalGeneration(T5PreTrainedModel):
                 "weight"][self.task_embedding_init_token]
             self.task_shared.data = init_weight.clone().detach()
         else:
+            print('random init task embedding')
             random_range = 0.5
             self.task_shared.data.uniform_(-random_range, random_range)
 

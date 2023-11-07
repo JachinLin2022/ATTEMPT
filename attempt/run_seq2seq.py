@@ -16,11 +16,6 @@
 Fine-tuning the library models for sequence to sequence.
 """
 # You can also adapt this script on your own sequence to sequence task. Pointers for this are left as comments.
-import os
-# os.environ["CUDA_VISIBLE_DEVICES"] = "0,1,2,3"
-# 设置HTTP代理环境变量
-os.environ['http_proxy'] = 'http://127.0.0.1:7890'
-os.environ['https_proxy'] = 'http://127.0.0.1:7890'
 
 # os.environ["CUDA_VISIBLE_DEVICES"] = "4,5"
 from adapters.lora import adapter_state_dict, lora_state_dict, task_embedding_state_dict
@@ -127,72 +122,85 @@ def main():
     # Set seed before initializing model.
     # training_args.seed = 30724
     set_seed(training_args.seed)
+    try:
+        # Load a model config
+        config = T5Config.from_pretrained(
+            model_args.config_name if model_args.config_name else model_args.model_name_or_path,
+            # cache_dir=model_args.cache_dir,
+            # revision=model_args.model_revision,
+            # use_auth_token=True if model_args.use_auth_token else None,
+        )
+        config.train_task_adapters = adapter_args.train_task_adapters
+        config.add_lora = adapter_args.add_lora
+        config.prefix_tuning = adapter_args.prefix_tuning
+        config.attn_prefix_tuning = model_args.attn_prefix_tuning
+        config.attn_method = model_args.attn_method
+        config.ignore_target = model_args.ignore_target
+        config.shared_attn = model_args.shared_attn
+        config.prefix_num = model_args.prefix_num
+        config.num_target = len(data_args.task_name)
+        config.target_task = data_args.task_name
+        config.source_task = data_args.task_name
+        # adamix
+        config.adapter_size = adapter_args.adapter_size
+        config.sharing_up = adapter_args.sharing_up
+        config.sharing_down = adapter_args.sharing_down
+        config.inference_level = adapter_args.inference_level
+        config.num_experts = adapter_args.num_experts
 
-    # Load a model config
-    config = T5Config.from_pretrained(
-        model_args.config_name if model_args.config_name else model_args.model_name_or_path,
-        cache_dir=model_args.cache_dir,
-        revision=model_args.model_revision,
-        use_auth_token=True if model_args.use_auth_token else None,
-    )
-    config.train_task_adapters = adapter_args.train_task_adapters
-    config.add_lora = adapter_args.add_lora
-    config.prefix_tuning = adapter_args.prefix_tuning
-    config.attn_prefix_tuning = model_args.attn_prefix_tuning
-    config.attn_method = model_args.attn_method
-    config.ignore_target = model_args.ignore_target
-    config.shared_attn = model_args.shared_attn
-    config.prefix_num = model_args.prefix_num
-    config.num_target = len(data_args.task_name)
-    config.target_task = data_args.task_name
-    config.source_task = data_args.task_name
-    if adapter_args.load_adapter_path is not None:
-        source_list = []
-        for adapter in adapter_args.load_adapter_path.split(','):
-            if 'qnli' in adapter:
-                source_list.append('qnli')
-            if 'mnli' in adapter:
-                source_list.append('mnli')
-            if 'qqp' in adapter:
-                source_list.append('qqp')
-            if 'sst2' in adapter:
-                source_list.append('sst2')
-        config.source_task = source_list
+        if adapter_args.load_adapter_path is not None:
+            source_list = []
+            for adapter in adapter_args.load_adapter_path.split(','):
+                if 'qnli' in adapter:
+                    source_list.append('qnli')
+                if 'mnli' in adapter:
+                    source_list.append('mnli')
+                if 'qqp' in adapter:
+                    source_list.append('qqp')
+                if 'sst2' in adapter:
+                    source_list.append('sst2')
+                if 'squad' in adapter:
+                    source_list.append('squad')
+                if 'superglue-record' in adapter:
+                    source_list.append('superglue-record')
+            config.source_task = source_list
 
-    config.temperature = model_args.temperature
-    config.learned_temperature = model_args.learned_temperature
-    config.fix_attention = model_args.fix_attention
-    adapter_config = get_adapter_config(
-        adapter_args, data_args, training_args, config)
-    config.lora_num = len(adapter_args.load_lora_path.split(',')) if adapter_args.load_lora_path else 1
-    config.add_task_embedding = adapter_args.add_task_embedding
-    config.load_task_path = adapter_args.load_task_path
-    config.init_task_from_vocab = adapter_args.init_task_from_vocab
-    # Set tokenizer
-    tokenizer = AutoTokenizer.from_pretrained(
-        model_args.tokenizer_name if model_args.tokenizer_name else model_args.model_name_or_path,
-        cache_dir=model_args.cache_dir,
-        use_fast=model_args.use_fast_tokenizer,
-        revision=model_args.model_revision,
-        use_auth_token=True if model_args.use_auth_token else None,
-    )
+        config.temperature = model_args.temperature
+        config.learned_temperature = model_args.learned_temperature
+        config.fix_attention = model_args.fix_attention
+        adapter_config = get_adapter_config(
+            adapter_args, data_args, training_args, config)
+        config.lora_num = len(adapter_args.load_lora_path.split(',')) if adapter_args.load_lora_path else 1
+        config.add_task_embedding = adapter_args.add_task_embedding
+        config.load_task_path = adapter_args.load_task_path
+        config.init_task_from_vocab = adapter_args.init_task_from_vocab
+        # Set tokenizer
+        tokenizer = AutoTokenizer.from_pretrained(
+            model_args.tokenizer_name if model_args.tokenizer_name else model_args.model_name_or_path,
+            # cache_dir=model_args.cache_dir,
+            # use_fast=model_args.use_fast_tokenizer,
+            # revision=model_args.model_revision,
+            # use_auth_token=True if model_args.use_auth_token else None,
+        )
 
-    # set task embedding param
-    if config.add_task_embedding:
-        init_task_param(config, tokenizer)
-        # data_args.max_source_length = data_args.max_source_length + config.task_embedding_len
-        # print('After add task embedding, max length is ', data_args.max_source_length)
+        # set task embedding param
+        if config.add_task_embedding:
+            init_task_param(config, tokenizer)
+            # data_args.max_source_length = data_args.max_source_length + config.task_embedding_len
+            # print('After add task embedding, max length is ', data_args.max_source_length)
 
-    # Initialize the model
-    model = T5ForConditionalGeneration.from_pretrained(
-        model_args.model_name_or_path,
-        from_tf=bool(".ckpt" in model_args.model_name_or_path),
-        config=config,
-        cache_dir=model_args.cache_dir,
-        revision=model_args.model_revision,
-        use_auth_token=True if model_args.use_auth_token else None,
-        adapter_config=adapter_config
-    )
+        # Initialize the model
+        model = T5ForConditionalGeneration.from_pretrained(
+            model_args.model_name_or_path,
+            # from_tf=bool(".ckpt" in model_args.model_name_or_path),
+            config=config,
+            # cache_dir=model_args.cache_dir,
+            # revision=model_args.model_revision,
+            # use_auth_token=True if model_args.use_auth_token else None,
+            adapter_config=adapter_config
+        )
+    except:
+        exit(1)
 
     if model_args.load_prefix_embeddings is True:
         if model_args.prompt_embedding_path is None:

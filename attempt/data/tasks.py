@@ -78,13 +78,17 @@ class AbstractTask(abc.ABC):
     def get_few_shot_indices(self, dataset, shot):
         import random
         random.seed(self.seed)
-        random_indices = list(range(0, len(dataset["label"])))
+        random_indices = list(range(0, dataset.num_rows))
         random.shuffle(random_indices)
 
         label_count = {}
         result = []
-        for index in random_indices:      
-            label = dataset['label'][index]
+        for index in random_indices:
+            if 'label' in dataset.features:
+                label = dataset['label'][index]
+            elif 'gold_label' in dataset.features:
+                label = dataset['gold_label'][index]
+            
             if label not in label_count:
                 label_count[label] = 0
                 not_hit = 0
@@ -881,14 +885,13 @@ class WinoGrande(AbstractTask):
     metric_names = ["accuracy"]
 
     def load_dataset(self, split):
-        print(777777777)
         return datasets.load_dataset('winogrande', "winogrande_xl", split=split)
 
     def preprocessor(self, example, add_prefix=True):
         src_texts = ["sentence:", example["sentence"],
-                     "option0:", example["option1"],
-                     "option1:", example["option2"]]
-        tgt_texts = [str(int(example["answer"]) - 1)]
+                     "option1:", example["option1"],
+                     "option2:", example["option2"]]
+        tgt_texts = [example["option"+str(int(example["answer"]))]]
         return self.seq2seq_format(src_texts, tgt_texts, add_prefix)
 
 

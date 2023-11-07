@@ -84,6 +84,14 @@ def freeze_model_params(model, adapter_args, adapter_config):
                     p.requires_grad = True
                 if 'temperature' in n:
                     p.requires_grad = True
+
+    # Unfreezes adamix
+    if adapter_args.num_experts is not None and adapter_args.num_experts > 1:
+        freeze_params(model)
+        for n, p in model.named_parameters():
+            if 'ExpertSoup' in n and 'expert_score_weight' not in n:
+                p.requires_grad = True
+
     # Unfreezes LoRA
     if adapter_args.train_lora:
         freeze_params(model)

@@ -15,6 +15,11 @@ class T5Config(T5Config):
                  task_embedding_init_token = None,
                  load_task_path = None,
                  init_task_from_vocab = None,
+                 adapter_size = None,
+                 num_experts = None,
+                 inference_level = None,
+                 sharing_down = None,
+                 sharing_up = None,
                  **kwargs):
         super().__init__(**kwargs)
         self.train_task_adapters = train_task_adapters
@@ -30,3 +35,10 @@ class T5Config(T5Config):
         self.task_embedding_init_token = task_embedding_init_token
         self.load_task_path = load_task_path
         self.init_task_from_vocab = init_task_from_vocab
+        
+        # adamix
+        self.adapter_size = adapter_size
+        self.num_experts = num_experts
+        self.inference_level = inference_level
+        self.sharing_down = sharing_down
+        self.sharing_up = sharing_up

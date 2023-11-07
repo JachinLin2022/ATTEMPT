@@ -1,5 +1,5 @@
 #!/bin/bash
-path="/mlx_devbox/users/linzhisheng.2021/ATTEMPT/attempt"
+path="/home/linzhisheng/ATTEMPT/attempt"
 
 
 # 函数：递归删除目录

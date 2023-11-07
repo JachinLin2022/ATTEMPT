@@ -30,13 +30,17 @@ report_to="none"
 add_lora=true
 train_lora=true
 add_task_embedding=true
-target_task=(superglue-record)
+init_task_from_vocab=true
+target_task=(squad)
+export CUDA_VISIBLE_DEVICES="0,1,2,3"
+export http_proxy='http://127.0.0.1:7890'
+export https_proxy='http://127.0.0.1:7890'
 for task in ${target_task[@]}
 do
 
     t=($task)
     num_train_epochs=5
-    output_dir="/home/linzhisheng/ATTEMPT/attempt/result/stage1_no_prefix/"$task
+    output_dir="/home/linzhisheng/ATTEMPT/attempt/result/stage1_init/"$task"_all_gpu"
 
     echo $task $num_train_epochs
         python run_seq2seq.py \
@@ -74,6 +78,7 @@ do
         --train_lora=$train_lora \
         --add_lora=$add_lora \
         --add_task_embedding=$add_task_embedding \
+        --init_task_from_vocab=$init_task_from_vocab \
         --logging_steps 10
     bash clean.sh $output_dir
 done
