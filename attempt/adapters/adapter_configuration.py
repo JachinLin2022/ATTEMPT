@@ -13,7 +13,7 @@ class AdapterConfig(object):
     We additionally pass all the configuration of parameter-efficient finetuning
     methods with this config."""
     add_layer_norm_before_adapter: bool = False
-    add_layer_norm_after_adapter: bool = True
+    add_layer_norm_after_adapter: bool = False
     non_linearity: str = "swish"
     task_reduction_factor: int = 16
     add_adapter_in_feed_forward = True

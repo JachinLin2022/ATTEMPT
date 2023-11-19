@@ -43,7 +43,7 @@ class AdapterTrainingArguments:
     )
     add_layer_norm_before_adapter: Optional[bool] = field(default=False, metadata={
         "help": "whether to have layer-norm before adapter."})
-    add_layer_norm_after_adapter: Optional[bool] = field(default=True,
+    add_layer_norm_after_adapter: Optional[bool] = field(default=False,
                                                          metadata={"help": "whether to have layer-norm after adapter."})
     hidden_dim: Optional[int] = field(default=128, metadata={"help": "defines the default hidden dimension for "
                                                              "adapter layers."})
@@ -151,7 +151,15 @@ class AdapterTrainingArguments:
         default=None, metadata={"help": "Adamix config"})
     sharing_up: Optional[int] = field(
         default=None, metadata={"help": "Adamix config"})
-
+    # mixda
+    apply_mixda: Optional[bool] = field(
+        default=None, metadata={"help": "mixda config"})
+    num_of_kas: Optional[int] = field(
+        default=None, metadata={"help": "mixda config"})
+    adapter_down_scale: Optional[int] = field(
+        default=None, metadata={"help": "mixda config"})
+    layers: Optional[str] = field(
+        default=None, metadata={"help": "mixda config"})
 
 @dataclass
 class TrainingArguments(Seq2SeqTrainingArguments):
@@ -372,7 +380,7 @@ class DataTrainingArguments:
         default=False, metadata={"help": "Overwrite the cached training and evaluation sets"}
     )
     preprocessing_num_workers: Optional[int] = field(
-        default=16,
+        default=1,
         metadata={"help": "The number of processes to use for the preprocessing."},
     )
     max_source_length: Optional[int] = field(

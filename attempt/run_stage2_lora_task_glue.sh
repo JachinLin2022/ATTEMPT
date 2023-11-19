@@ -43,14 +43,14 @@ target_task=(newsqa searchqa hotpotqa)
 target_task=(cola rte superglue-cb superglue-wsc-fixed mrpc stsb superglue-wic superglue-boolq superglue-multirc)
 
 seed=4096
-target_task=(hotpotqa)
+target_task=(yelp_polarity)
 echo $CUDA_VISIBLE_DEVICES
 for task in ${target_task[@]}
 do
     for learning_rate in ${lrs[@]}
     do
         t=($task)
-        num_train_epochs=20
+        num_train_epochs=5
         warmup_steps=0
         per_device_train_batch_size=128
         max_source_length=256

@@ -26,7 +26,7 @@ def create_dir(output_dir):
 
 
 def get_adapter_config(adapter_args, data_args, training_args, config):
-    if adapter_args.train_task_adapters or adapter_args.prefix_tuning or adapter_args.bitfit:
+    if adapter_args.train_task_adapters or adapter_args.prefix_tuning or adapter_args.bitfit or adapter_args.apply_mixda:
         adapter_config = AutoAdapterConfig.get(
             adapter_args.adapter_config_name)
         adapter_config.input_dim = config.d_model
@@ -91,7 +91,19 @@ def freeze_model_params(model, adapter_args, adapter_config):
         for n, p in model.named_parameters():
             if 'ExpertSoup' in n and 'expert_score_weight' not in n:
                 p.requires_grad = True
-
+    # Unfreezes mixda
+    if adapter_args.apply_mixda:
+        freeze_params(model)
+        for n, p in model.named_parameters():
+            if 'gating' in n:
+                p.requires_grad = True
+        for name, sub_module in model.named_modules():
+            if isinstance(sub_module, (AdapterController, Adapter)):
+                for param_name, param in sub_module.named_parameters():
+                    if param_name.find(adapter_config.tasks[0]) >= 0:
+                        param.requires_grad = True
+    
+    
     # Unfreezes LoRA
     if adapter_args.train_lora:
         freeze_params(model)

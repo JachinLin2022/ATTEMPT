@@ -83,6 +83,8 @@ class AbstractTask(abc.ABC):
 
         label_count = {}
         result = []
+        if self.name == 'stsb':
+            return random_indices[:shot]
         for index in random_indices:
             if 'label' in dataset.features:
                 label = dataset['label'][index]
@@ -142,7 +144,7 @@ class AbstractTask(abc.ABC):
                 self.labels_map = dataset.features[key].names
         
         return dataset.map(functools.partial(self.preprocessor, add_prefix=add_prefix),
-                           remove_columns=dataset.column_names,num_proc=16)
+                           remove_columns=dataset.column_names,num_proc=1)
 
     def get(self, split, add_prefix=True, n_obs=None, split_validation_test=False, lang=None, file_name=None, few_shot=None):
         # For small datasets (n_samples < 10K) without test set, we divide validation set to

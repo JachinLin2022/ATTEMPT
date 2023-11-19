@@ -59,7 +59,6 @@ from metrics.metrics import build_compute_metrics_fn
 os.environ['MKL_THREADING_LAYER'] = 'GNU'
 os.environ['MKL_SERVICE_FORCE_INTEL'] = '1'
 
-
 logger = logging.getLogger(__name__)
 
 
@@ -147,6 +146,11 @@ def main():
         config.sharing_down = adapter_args.sharing_down
         config.inference_level = adapter_args.inference_level
         config.num_experts = adapter_args.num_experts
+        # mixda
+        config.apply_mixda = adapter_args.apply_mixda
+        config.num_of_kas = adapter_args.num_of_kas
+        config.adapter_down_scale = adapter_args.adapter_down_scale
+        config.layers = [int(item) for item in adapter_args.layers.split(',')] if adapter_args.layers is not None else None
 
         if adapter_args.load_adapter_path is not None:
             source_list = []
@@ -199,7 +203,8 @@ def main():
             # use_auth_token=True if model_args.use_auth_token else None,
             adapter_config=adapter_config
         )
-    except:
+    except Exception as e:
+        print(e)
         exit(1)
 
     if model_args.load_prefix_embeddings is True:

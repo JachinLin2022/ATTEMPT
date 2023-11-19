@@ -47,7 +47,7 @@ from transformers.utils import logging
 from transformers.utils.model_parallel_utils import assert_device_map, get_device_map
 from .configuration_t5 import T5Config
 
-from adapters import AdapterController,Linear,ExpertSoup
+from adapters import AdapterController,Linear,ExpertSoup,MixtureOfDomainAdapter,MoeGating
 from typing import Dict, Any, List, Tuple, Optional
 
 logger = logging.get_logger(__name__)
@@ -286,12 +286,13 @@ class T5LayerNorm(nn.Module):
 
 
 class T5DenseReluDense(nn.Module):
-    def __init__(self, config, adapter_config=None):
+    def __init__(self, config, adapter_config=None, layer_idx=None):
         super().__init__()
         self.bitfit = adapter_config.bitfit if adapter_config is not None else False
         self.config = config
         self.train_task_adapters = config.train_task_adapters and adapter_config.add_adapter_in_feed_forward_out
-        self.apply_expert_soup = True if config.num_experts is not None else False
+        self.apply_expert_soup = True if config.num_experts is not None else False#num_experts only using for adamix
+        self.apply_mixda = True if config.layers is not None and layer_idx in config.layers and config.apply_mixda else False
         self.add_lora = config.add_lora
         self.task_prefix_len = config.task_embedding_len
         if config.add_lora:
@@ -316,6 +317,25 @@ class T5DenseReluDense(nn.Module):
                 self.ExpertSoup = ExpertSoup(config.d_model, config.adapter_size, 'gelu', num_expert=config.num_experts,
                                          inference_level=config.inference_level, sharing_down=config.sharing_down,
                                          sharing_up=config.sharing_up)
+            
+            
+            if self.apply_mixda:
+                self.kas = None
+                adapter_list = []
+                for _ in range(config.num_of_kas):
+                    adapter_list.append(MixtureOfDomainAdapter(config))
+                self.kas = nn.ModuleList(adapter_list)
+                self.gating = MoeGating(config.d_ff, 768, len(adapter_list) + 1, 3, 0.2) if self.apply_mixda else None
+
+
+                print(adapter_config)
+                adapter_config.reduction_factor = config.adapter_down_scale
+                adapter_config.input_dim = config.d_model
+                adapter_config.output_dim = config.d_model
+                adapter_config.tasks = config.target_task
+                adapter_config.non_linearity = 'gelu_new'
+                self.adapter_controller = AdapterController(adapter_config)
+            
             self.wi = nn.Linear(config.d_model, config.d_ff,
                             bias=False if not self.bitfit else True)
             self.wo = nn.Linear(config.d_ff, config.d_model,
@@ -365,7 +385,34 @@ class T5DenseReluDense(nn.Module):
             if isinstance(hidden_states, tuple):
                 all_result = hidden_states[2]
                 moe_weight = hidden_states[1]
-                hidden_states = hidden_states[0]    
+                hidden_states = hidden_states[0] 
+        elif self.apply_mixda:
+            all_results = None
+            if self.apply_mixda and self.kas is not None:
+                all_results = []
+                for adapter in self.kas:
+                    all_results.append(adapter(hidden_states))
+            if self.gating is not None:
+                gating_weights = self.gating(hidden_states)
+            
+            hidden_states = self.wo(hidden_states)
+            
+            if all_results is not None:
+                all_results.append(hidden_states)
+                if self.gating is not None:
+                    final_output = torch.stack(all_results, dim=3) @ gating_weights.unsqueeze(3)
+                    final_output = final_output.squeeze()
+                else:
+                    final_output = all_results[0]
+            else:
+                final_output = hidden_states
+
+            if len(final_output.shape) == 2:
+                final_output = final_output.unsqueeze(1)
+                    
+            hidden_states = self.adapter_controller(final_output, task)
+
+                    
         else:
             hidden_states = self.wo(hidden_states)
             if self.apply_expert_soup:
@@ -399,12 +446,12 @@ class T5DenseGatedGeluDense(nn.Module):
 
 
 class T5LayerFF(nn.Module):
-    def __init__(self, config, adapter_config=None):
+    def __init__(self, config, adapter_config=None, layer_idx=None):
         super().__init__()
         self.config = config
         if config.feed_forward_proj == "relu":
             self.DenseReluDense = T5DenseReluDense(
-                config, adapter_config=adapter_config)
+                config, adapter_config=adapter_config, layer_idx=layer_idx)
         elif config.feed_forward_proj == "gated-gelu":
             self.DenseReluDense = T5DenseGatedGeluDense(
                 config, adapter_config=adapter_config)
@@ -780,7 +827,7 @@ class T5LayerCrossAttention(nn.Module):
 
 
 class T5Block(nn.Module):
-    def __init__(self, config, has_relative_attention_bias=False, adapter_config=None):
+    def __init__(self, config, has_relative_attention_bias=False, adapter_config=None, layer_idx=None):
         super().__init__()
         self.is_decoder = config.is_decoder
         self.layer = nn.ModuleList()
@@ -790,7 +837,7 @@ class T5Block(nn.Module):
             self.layer.append(T5LayerCrossAttention(
                 config, adapter_config=adapter_config))
 
-        self.layer.append(T5LayerFF(config, adapter_config=adapter_config))
+        self.layer.append(T5LayerFF(config, adapter_config=adapter_config, layer_idx=layer_idx))
 
     def forward(
         self,
@@ -1068,7 +1115,7 @@ class T5Stack(T5PreTrainedModel):
         self.block = nn.ModuleList(
             [T5Block(self.per_layer_config(config, i, self.adapter_config, self.is_decoder),
                      has_relative_attention_bias=bool(i == 0),
-                     adapter_config=adapter_config) for i in range(config.num_layers)]
+                     adapter_config=adapter_config, layer_idx=i) for i in range(config.num_layers)]
         )
         self.final_layer_norm = T5LayerNorm(
             config.d_model, eps=config.layer_norm_epsilon)

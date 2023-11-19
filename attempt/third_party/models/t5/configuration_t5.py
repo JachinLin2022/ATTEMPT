@@ -20,6 +20,10 @@ class T5Config(T5Config):
                  inference_level = None,
                  sharing_down = None,
                  sharing_up = None,
+                 apply_mixda = None,
+                 num_of_kas = None,
+                 adapter_down_scale = None,
+                 layers=None,
                  **kwargs):
         super().__init__(**kwargs)
         self.train_task_adapters = train_task_adapters
@@ -42,3 +46,9 @@ class T5Config(T5Config):
         self.inference_level = inference_level
         self.sharing_down = sharing_down
         self.sharing_up = sharing_up
+        
+        # mixda
+        self.apply_mixda = apply_mixda
+        self.num_of_kas = num_of_kas
+        self.adapter_down_scale = adapter_down_scale
+        self.layers = layers

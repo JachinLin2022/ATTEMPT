@@ -15,7 +15,7 @@ per_device_eval_batch_size=256
 load_best_model_at_end=true
 metric_for_best_model="average_metrics"
 greater_is_better=true
-evaluation_strategy="no"
+evaluation_strategy="epoch"
 non_linearity="gelu_new"
 max_source_length=256
 learning_rate=3e-4
@@ -30,21 +30,21 @@ report_to="none"
 add_lora=true
 add_task_embedding=true
 train_task_adapters=true
-few_shots=(32)
+few_shots=(4)
 export CUDA_VISIBLE_DEVICES="0"
 export http_proxy='http://127.0.0.1:7890'
 export https_proxy='http://127.0.0.1:7890'
 
-epochs=(20 40 60)
+epochs=(20)
 big_task=(superglue-multirc)
 small_task=(superglue-cb superglue-wsc-fixed)
 qa_task=(nq newsqa searchqa hotpotqa) 
-lrs=(2e-3)
+lrs=(6e-4)
 task_reduction_factor=16
 target_task=(superglue-cb cola superglue-wsc-fixed mrpc stsb rte superglue-wic superglue-boolq superglue-multirc)
 target_task=(newsqa searchqa hotpotqa)
 
-target_task=(superglue-wic)
+target_task=(stsb)
 for task in ${target_task[@]}
 do
     for learning_rate in ${lrs[@]}
