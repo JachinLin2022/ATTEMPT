@@ -97,6 +97,8 @@ def freeze_model_params(model, adapter_args, adapter_config):
         for n, p in model.named_parameters():
             if 'gating' in n:
                 p.requires_grad = True
+            # if 'kas' in n:
+            #     p.requires_grad = True
         for name, sub_module in model.named_modules():
             if isinstance(sub_module, (AdapterController, Adapter)):
                 for param_name, param in sub_module.named_parameters():

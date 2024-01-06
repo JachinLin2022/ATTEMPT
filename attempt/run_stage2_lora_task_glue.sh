@@ -43,7 +43,7 @@ target_task=(newsqa searchqa hotpotqa)
 target_task=(cola rte superglue-cb superglue-wsc-fixed mrpc stsb superglue-wic superglue-boolq superglue-multirc)
 
 seed=4096
-target_task=(yelp_polarity)
+target_task=(cola)
 echo $CUDA_VISIBLE_DEVICES
 for task in ${target_task[@]}
 do
@@ -82,7 +82,8 @@ do
         # 6lora init
         load_lora_path="/home/linzhisheng/ATTEMPT/attempt/result/stage1_no_prefix/mnli/lora.pt,/home/linzhisheng/ATTEMPT/attempt/result/stage1_no_prefix/qnli/lora.pt,/home/linzhisheng/ATTEMPT/attempt/result/stage1_no_prefix/qqp/lora.pt,/home/linzhisheng/ATTEMPT/attempt/result/stage1_no_prefix/sst2/lora.pt,/home/linzhisheng/ATTEMPT/attempt/result/stage1_no_prefix/squad/lora.pt,/home/linzhisheng/ATTEMPT/attempt/result/stage1_no_prefix/superglue-record/lora.pt"
         load_task_path="/home/linzhisheng/ATTEMPT/attempt/result/stage1_no_prefix/mnli/task_embedding.pt,/home/linzhisheng/ATTEMPT/attempt/result/stage1_no_prefix/qnli/task_embedding.pt,/home/linzhisheng/ATTEMPT/attempt/result/stage1_no_prefix/qqp/task_embedding.pt,/home/linzhisheng/ATTEMPT/attempt/result/stage1_no_prefix/sst2/task_embedding.pt,/home/linzhisheng/ATTEMPT/attempt/result/stage1_no_prefix/squad/task_embedding.pt,/home/linzhisheng/ATTEMPT/attempt/result/stage1_no_prefix/superglue-record/task_embedding.pt"
-        output_dir="/home/linzhisheng/ATTEMPT/attempt/result/stage2_$seed/$task/"$learning_rate"_"$per_device_train_batch_size"_"$task_reduction_factor"_"$CUDA_VISIBLE_DEVICES
+        # output_dir="/home/linzhisheng/ATTEMPT/attempt/result/stage2_$seed/$task/"$learning_rate"_"$per_device_train_batch_size"_"$task_reduction_factor"_"$CUDA_VISIBLE_DEVICES
+        output_dir="/home/linzhisheng/ATTEMPT/attempt/result/test/"$learning_rate"_"$per_device_train_batch_size"_"$task_reduction_factor"_"$CUDA_VISIBLE_DEVICES
 
         while true
         do

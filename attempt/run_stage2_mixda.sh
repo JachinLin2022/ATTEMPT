@@ -36,13 +36,13 @@ export https_proxy='http://127.0.0.1:7890'
 big_task=(superglue-multirc)
 small_task=(superglue-cb superglue-wsc-fixed)
 qa_task=(nq newsqa searchqa hotpotqa) 
-lrs=(6e-4)
+lrs=(6e-5)
 target_task=(superglue-cb cola superglue-wsc-fixed mrpc stsb rte superglue-wic superglue-boolq superglue-multirc)
 target_task=(newsqa searchqa hotpotqa)
 
-export CUDA_VISIBLE_DEVICES="0"
+export CUDA_VISIBLE_DEVICES="3"
 target_task=(superglue-cb cola superglue-wsc-fixed mrpc stsb rte superglue-wic superglue-boolq)
-target_task=(scitail)
+target_task=(cola)
 for task in ${target_task[@]}
 do
     for learning_rate in ${lrs[@]}

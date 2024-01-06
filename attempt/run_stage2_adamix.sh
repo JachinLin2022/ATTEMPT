@@ -41,7 +41,7 @@ lrs=(6e-4)
 target_task=(superglue-cb cola superglue-wsc-fixed mrpc stsb rte superglue-wic superglue-boolq superglue-multirc)
 target_task=(newsqa searchqa hotpotqa)
 
-target_task=(nq newsqa searchqa hotpotqa)
+target_task=(cola)
 for task in ${target_task[@]}
 do
     for learning_rate in ${lrs[@]}
@@ -73,7 +73,7 @@ do
             per_device_train_batch_size=100
         fi
 
-        output_dir="/home/linzhisheng/ATTEMPT/attempt/result/adamix/"$learning_rate"_"$task"_"$per_device_train_batch_size"_"$CUDA_VISIBLE_DEVICES
+        output_dir="/home/linzhisheng/ATTEMPT/attempt/result/adamixttt/"$learning_rate"_"$task"_"$per_device_train_batch_size"_"$CUDA_VISIBLE_DEVICES
 
         while true
         do
@@ -114,7 +114,7 @@ do
                 --sharing_down 0 \
                 --inference_level 3 \
                 --adapter_size 64 \
-                --num_experts 6 \
+                --num_experts 4 \
                 --logging_steps 10 \
                 --seed 42
             if [[ $? -eq 0 ]]; then
