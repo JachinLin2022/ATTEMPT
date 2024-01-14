@@ -1,0 +1,8 @@
+{
+    "epoch": 5.0,
+    "test_accuracy": 94.38073394495413,
+    "test_average_metrics": 94.38073394495413,
+    "test_loss": 0.09700337052345276,
+    "test_runtime": 2.3677,
+    "test_samples_per_second": 368.284
+}

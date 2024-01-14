@@ -1,0 +1,9 @@
+{
+    "epoch": 5.0,
+    "test_average_metrics": 76.47528306829813,
+    "test_em": 69.15799432355723,
+    "test_f1": 83.79257181303903,
+    "test_loss": 0.31135958433151245,
+    "test_runtime": 170.4557,
+    "test_samples_per_second": 62.01
+}
