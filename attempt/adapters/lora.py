@@ -212,6 +212,7 @@ class Linear(nn.Linear, LoRALayer):
             all_results=None
             if self.lora_num == 1:         
                 result += (self.lora_dropout(x) @ self.lora_A.transpose(0, 1) @ self.lora_B.transpose(0, 1)) * self.scaling
+                return result
             else:
                 # gates, load = self.noisy_top_k_gating(x, self.training)
                 # importance = gates.sum(0)

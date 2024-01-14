@@ -131,6 +131,8 @@ def main():
         )
         config.train_task_adapters = adapter_args.train_task_adapters
         config.add_lora = adapter_args.add_lora
+        config.add_atten_lora = adapter_args.add_atten_lora
+        config.atten_lora_rank = adapter_args.atten_lora_rank
         config.prefix_tuning = adapter_args.prefix_tuning
         config.attn_prefix_tuning = model_args.attn_prefix_tuning
         config.attn_method = model_args.attn_method
@@ -265,6 +267,7 @@ def main():
     for n,p in model.named_parameters():
         if 'lora' in n:
             print(n, p.requires_grad,p.shape)
+
     # print(model.decoder.block[11].layer[2].adapter_controller.adapters.rte.down_sampler.weight)
     training_args.run_name = training_args.output_dir + '-' + ''.join(data_args.task_name)
     data_args.dataset_name = data_args.task_name

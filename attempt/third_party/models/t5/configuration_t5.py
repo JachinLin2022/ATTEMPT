@@ -7,7 +7,9 @@ class T5Config(T5Config):
                  train_task_adapters=False,
                  prefix_tuning=False,
                  add_lora=False,
+                 add_atten_lora=False,
                  lora_num=1,
+                 atten_lora_rank=8,
                  source_task = None,
                  target_task = None,
                  add_task_embedding = None,
@@ -52,3 +54,7 @@ class T5Config(T5Config):
         self.num_of_kas = num_of_kas
         self.adapter_down_scale = adapter_down_scale
         self.layers = layers
+
+        # origin_lora
+        self.add_atten_lora = add_atten_lora
+        self.atten_lora_rank = atten_lora_rank

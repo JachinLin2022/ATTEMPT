@@ -511,14 +511,20 @@ class T5Attention(nn.Module):
         self.inner_dim = self.n_heads * self.key_value_proj_dim
 
         # Mesh TensorFlow initialization to avoid scaling before softmax
-        self.q = nn.Linear(self.d_model, self.inner_dim,
-                           bias=False if not self.bitfit else True)
-        self.k = nn.Linear(self.d_model, self.inner_dim,
-                           bias=False if not self.bitfit else True)
-        self.v = nn.Linear(self.d_model, self.inner_dim,
-                           bias=False if not self.bitfit else True)
-        self.o = nn.Linear(self.inner_dim, self.d_model,
-                           bias=False if not self.bitfit else True)
+        if config.add_atten_lora:
+            self.q = Linear(config.d_model, self.inner_dim, config.atten_lora_rank, config.atten_lora_rank, 0, bias=False if not self.bitfit else True, merge_weights=False, lora_num=1, task_prefix_len=config.task_embedding_len, is_decoder=config.is_decoder)
+            self.k = Linear(config.d_model, self.inner_dim, config.atten_lora_rank, config.atten_lora_rank, 0, bias=False if not self.bitfit else True, merge_weights=False, lora_num=1, task_prefix_len=config.task_embedding_len, is_decoder=config.is_decoder)
+            self.v = Linear(config.d_model, self.inner_dim, config.atten_lora_rank, config.atten_lora_rank, 0, bias=False if not self.bitfit else True, merge_weights=False, lora_num=1, task_prefix_len=config.task_embedding_len, is_decoder=config.is_decoder)
+            self.o = Linear(self.inner_dim, config.d_model, config.atten_lora_rank, config.atten_lora_rank, 0, bias=False if not self.bitfit else True, merge_weights=False, lora_num=1, task_prefix_len=config.task_embedding_len, is_decoder=config.is_decoder)
+        else:
+            self.q = nn.Linear(self.d_model, self.inner_dim,
+                            bias=False if not self.bitfit else True)
+            self.k = nn.Linear(self.d_model, self.inner_dim,
+                            bias=False if not self.bitfit else True)
+            self.v = nn.Linear(self.d_model, self.inner_dim,
+                            bias=False if not self.bitfit else True)
+            self.o = nn.Linear(self.inner_dim, self.d_model,
+                            bias=False if not self.bitfit else True)
 
         if self.has_relative_attention_bias:
             self.relative_attention_bias = nn.Embedding(

@@ -5,4 +5,5 @@ attempt.egg-info
 wandb
 *.log
 *.out
-result
+result**
+source_prompts**

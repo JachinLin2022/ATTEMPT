@@ -18,6 +18,11 @@ class AdapterTrainingArguments:
 
     add_lora: Optional[bool] = field(default=False,
                                                 metadata={"help": "If set, adds lora in FFN."})
+    add_atten_lora: Optional[bool] = field(default=False,
+                                                metadata={"help": "If set, adds lora in Atten."})
+    
+    atten_lora_rank: Optional[int] = field(default=8,
+                                                metadata={"help": "If set, adds lora in Atten."})
 
     lora_num: Optional[int] = field(default=1,
                                                 metadata={"help": "If set, adds lora in FFN."})

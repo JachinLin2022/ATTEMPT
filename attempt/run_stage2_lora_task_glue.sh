@@ -29,14 +29,14 @@ compute_memory=true
 report_to="none"
 add_lora=true
 add_task_embedding=true
-export CUDA_VISIBLE_DEVICES="0,1,2,3"
+export CUDA_VISIBLE_DEVICES="3"
 export http_proxy='http://127.0.0.1:7890'
 export https_proxy='http://127.0.0.1:7890'
 
 big_task=(superglue-multirc)
 small_task=(superglue-cb superglue-wsc-fixed)
 qa_task=(nq newsqa searchqa hotpotqa) 
-lrs=(1e-3 3e-4)
+lrs=(1e-3)
 task_reduction_factor=16
 target_task=(superglue-cb cola superglue-wsc-fixed mrpc stsb rte superglue-wic superglue-boolq superglue-multirc)
 target_task=(newsqa searchqa hotpotqa)
@@ -50,7 +50,7 @@ do
     for learning_rate in ${lrs[@]}
     do
         t=($task)
-        num_train_epochs=5
+        num_train_epochs=20
         warmup_steps=0
         per_device_train_batch_size=128
         max_source_length=256
@@ -83,7 +83,7 @@ do
         load_lora_path="/home/linzhisheng/ATTEMPT/attempt/result/stage1_no_prefix/mnli/lora.pt,/home/linzhisheng/ATTEMPT/attempt/result/stage1_no_prefix/qnli/lora.pt,/home/linzhisheng/ATTEMPT/attempt/result/stage1_no_prefix/qqp/lora.pt,/home/linzhisheng/ATTEMPT/attempt/result/stage1_no_prefix/sst2/lora.pt,/home/linzhisheng/ATTEMPT/attempt/result/stage1_no_prefix/squad/lora.pt,/home/linzhisheng/ATTEMPT/attempt/result/stage1_no_prefix/superglue-record/lora.pt"
         load_task_path="/home/linzhisheng/ATTEMPT/attempt/result/stage1_no_prefix/mnli/task_embedding.pt,/home/linzhisheng/ATTEMPT/attempt/result/stage1_no_prefix/qnli/task_embedding.pt,/home/linzhisheng/ATTEMPT/attempt/result/stage1_no_prefix/qqp/task_embedding.pt,/home/linzhisheng/ATTEMPT/attempt/result/stage1_no_prefix/sst2/task_embedding.pt,/home/linzhisheng/ATTEMPT/attempt/result/stage1_no_prefix/squad/task_embedding.pt,/home/linzhisheng/ATTEMPT/attempt/result/stage1_no_prefix/superglue-record/task_embedding.pt"
         # output_dir="/home/linzhisheng/ATTEMPT/attempt/result/stage2_$seed/$task/"$learning_rate"_"$per_device_train_batch_size"_"$task_reduction_factor"_"$CUDA_VISIBLE_DEVICES
-        output_dir="/home/linzhisheng/ATTEMPT/attempt/result/test/"$learning_rate"_"$per_device_train_batch_size"_"$task_reduction_factor"_"$CUDA_VISIBLE_DEVICES
+        output_dir="/home/linzhisheng/ATTEMPT/attempt/result/test/"$task"/"$learning_rate"_"$per_device_train_batch_size"_"$task_reduction_factor"_"$CUDA_VISIBLE_DEVICES
 
         while true
         do
